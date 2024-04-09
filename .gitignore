@@ -1,0 +1,13 @@
+*~
+*__pycache__/
+**/__pycache__/
+**/.DS_store
+**/.DS_Store
+*.png
+*.npy
+*.pdf
+**/*.png
+**/*.npy
+**/*.pdf
+**/*.jpeg
+**/*.jpg
