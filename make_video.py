@@ -49,5 +49,37 @@ def save_pdf3d_proj():
     cv2.destroyAllWindows()
     video.release()
 
+def save_sle_correct():
+    image_folder = 'videos_yannis-main/data/sle'
+    video_name = 'video_sle_correct.avi'
+
+    images = [img for img in os.listdir(image_folder) if img.endswith(".png") and img.startswith('sl_surf_')]
+    frame = cv2.imread(os.path.join(image_folder, images[0]))
+    height, width, layers = frame.shape
+
+    video = cv2.VideoWriter(video_name, 0, 1, (width,height))
+
+    for image in images:
+        video.write(cv2.imread(os.path.join(image_folder, image)))
+
+    cv2.destroyAllWindows()
+    video.release()
+
+def save_mcgle():
+    image_folder = 'videos_yannis-main/data/mcgle_2d'
+    video_name = 'video_mcgle.avi'
+
+    images = [img for img in os.listdir(image_folder) if img.endswith(".png") and img.startswith('pdf_3d_')]
+    frame = cv2.imread(os.path.join(image_folder, images[0]))
+    height, width, layers = frame.shape
+
+    video = cv2.VideoWriter(video_name, 0, 1, (width,height))
+
+    for image in images:
+        video.write(cv2.imread(os.path.join(image_folder, image)))
+
+    cv2.destroyAllWindows()
+    video.release()
+
 if __name__ == '__main__':
-    save_pdfdd()
+    save_mcgle()

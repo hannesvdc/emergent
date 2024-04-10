@@ -32,7 +32,7 @@ Aimag = np.linspace(min_max_imag[0], min_max_imag[1], nbins + 1)
 # Create 2d grids for the histogram plot:
 X2, Y2 = np.meshgrid(Areal, Aimag)
 
-for t in range(data["n_time_steps"]+1):
+for t in range(data["n_time_steps"]): #+1?
     print(t)
 
     # Create histogram of oscillator positions in the complex plane.

@@ -4,8 +4,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 
-from lpde.dataset import Dataset
-from lpde.utils import get_dudt_and_reshape_data
+#from lpde.dataset import Dataset
+#from lpde.utils import get_dudt_and_reshape_data
 
 
 def dudt(time: float,  # pylint: disable=unused-argument
