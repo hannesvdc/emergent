@@ -23,7 +23,13 @@ def fGinzburgLandau(W, h, c1, c2, nu):
 This function integrates the 2-dimensional complex Ginzburg-Landau
 equations. We assume periodic boundaries on the domain [0,1]x[0,1].
 """
-def integrateGinzburgLandauEuler(W0, h, M, dt, Tf, params, tol=0.1):
+def integrateGinzburgLandauEuler(W0: np.ndarray, 
+                                 h: float, 
+                                 M:int, 
+                                 dt: float,
+                                 Tf: float, 
+                                 params: dict, 
+                                 tol=0.1):
     c1 = params['c1']
     c2 = params['c2']
     nu = params['nu']
@@ -32,6 +38,7 @@ def integrateGinzburgLandauEuler(W0, h, M, dt, Tf, params, tol=0.1):
     W = np.copy(W0)
     T = 0.0
     n_print = 0.01
+    time_evolution = [(T, W)]
     while T < Tf:
         if T > n_print:
             print('\nt =', T, 'dt =', dt, np.average(W))
@@ -47,22 +54,21 @@ def integrateGinzburgLandauEuler(W0, h, M, dt, Tf, params, tol=0.1):
                 T = T + dt
                 dt = 1.2*dt
                 break
+        time_evolution.append((T, W))
 
-    return W
+    return W, time_evolution
 
-def integrateGinzburgLandauRK4(W0, h, M, dt, Tf, params):
+def integrateGinzburgLandauRK4(W0: np.ndarray, h: float, M: int, dt: float, Tf: float, params: dict):
     c1 = params['c1']
     c2 = params['c2']
     nu = params['nu']
 
     # Do time-integration
     W = np.copy(W0)
-    N = Tf / dt
+    N = int(Tf / dt)
     n_print = 0.01
     for n in range(N):
-        if n*dt > n_print:
-            print('\nt =', n*dt, np.average(W))
-            n_print += 0.01
+        print('\nt =', n*dt, np.average(W))
 
         # RK4 Temporary variables
         k1 = fGinzburgLandau(W,             h, c1, c2, nu)
@@ -81,16 +87,19 @@ def integrateGinzburgLandauRK4(W0, h, M, dt, Tf, params):
 # with positive (real and imaginary) random initial conditions (can be changed later)
 def runGinzburgLandau():
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5}
-    dt = 1.e-6   # chosen for stability
+    dt = 1.e-6   # chosen for stability (RK$ 5.e-6)
     M = 256      # from run_2d.py
     h = 1.0 / M  # from run_2d.py
-    T = 10       # No reason at all
+    T = 10.0     # No reason at all
 
     rng = rd.RandomState()
     W0 = rng.uniform(low=0.0, high=1.0, size=(M,M)) + rng.uniform(low=0.0, high=1.0, size=(M,M))*1j
-    W = integrateGinzburgLandauEuler(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
+    W, time_evolution = integrateGinzburgLandauEuler(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
+    print(W)
 
-    np.save('Ginzburg_Landau.npy', W)
+    for n in range(len(time_evolution)):
+        t = time_evolution[n][0]
+        np.save('simulation_data/Ginzburg_Landau_Euler_T='+str(t)+'.npy', time_evolution[n][1])
 
 def plotGinzburgLandau(W):
     angles = np.angle(W)
@@ -102,7 +111,7 @@ def plotGinzburgLandau(W):
 
     fig = plt.figure()
     ax = fig.add_subplot(121, projection='3d')
-    ax.plot_surface(X2, Y2, np.absolute(W), facecolors=color_map, alpha=1, shade=False, rstride=1, cstride=1)
+    ax.plot_surface(X2, Y2, np.absolute(W), facecolors=color_map, shade=False)
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_zlabel(r'$|W|$')
