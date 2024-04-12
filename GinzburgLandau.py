@@ -4,12 +4,26 @@ import numpy.random as rd
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
+def fGinzburgLandau(W, h, c1, c2, nu):
+    dWdx = (np.roll(W, 1, axis=1) - 2.0*W + np.roll(W, -1, axis=1)) / h**2
+    dWdy = (np.roll(W, 1, axis=0) - 2.0*W + np.roll(W, -1, axis=0)) / h**2
+    laplacian = dWdx + dWdy
+    modl = np.square(np.abs(W))
+    prod_term = np.multiply(modl, W)
+
+    # Compute right-hand side
+    rhs = W + (1.0 + c1*1j) * laplacian \
+            - (1.0 + c2*1j) * prod_term \
+            - (1.0 + nu*1j) * np.average(W) \
+            + (1.0 + c2*1j) * np.average(prod_term)
+    
+    return rhs
 
 """
 This function integrates the 2-dimensional complex Ginzburg-Landau
 equations. We assume periodic boundaries on the domain [0,1]x[0,1].
 """
-def integrateComplexPDE(W0, h, M, dt, Tf, params, tol=0.1):
+def integrateGinzburgLandauEuler(W0, h, M, dt, Tf, params, tol=0.1):
     c1 = params['c1']
     c2 = params['c2']
     nu = params['nu']
@@ -23,20 +37,8 @@ def integrateComplexPDE(W0, h, M, dt, Tf, params, tol=0.1):
             print('\nt =', T, 'dt =', dt, np.average(W))
             n_print += 0.01
 
-        # Compute spatial second derivatives - can be faster than double-loop implementation
-        dWdx = (np.roll(W, 1, axis=1) - 2.0*W + np.roll(W, -1, axis=1)) / h**2
-        dWdy = (np.roll(W, 1, axis=0) - 2.0*W + np.roll(W, -1, axis=0)) / h**2
-        laplacian = dWdx + dWdy
-        modl = np.square(np.abs(W))
-        prod_term = np.multiply(modl, W)
-
-        # Compute right-hand side
-        rhs = W + (1.0 + c1*1j) * laplacian \
-                - (1.0 + c2*1j) * prod_term \
-                - (1.0 + nu*1j) * np.average(W) \
-                + (1.0 + c2*1j) * np.average(prod_term)
-
         # Euler time-stepping
+        rhs = fGinzburgLandau(W, h, c1, c2, nu)
         while True:
             if lg.norm(dt*rhs / (M*M), ord=np.inf) > tol:
                 dt = 0.5*dt
@@ -46,8 +48,34 @@ def integrateComplexPDE(W0, h, M, dt, Tf, params, tol=0.1):
                 dt = 1.2*dt
                 break
 
+    return W
+
+def integrateGinzburgLandauRK4(W0, h, M, dt, Tf, params):
+    c1 = params['c1']
+    c2 = params['c2']
+    nu = params['nu']
+
+    # Do time-integration
+    W = np.copy(W0)
+    N = Tf / dt
+    n_print = 0.01
+    for n in range(N):
+        if n*dt > n_print:
+            print('\nt =', n*dt, np.average(W))
+            n_print += 0.01
+
+        # RK4 Temporary variables
+        k1 = fGinzburgLandau(W,             h, c1, c2, nu)
+        k2 = fGinzburgLandau(W + 0.5*dt*k1, h, c1, c2, nu)
+        k3 = fGinzburgLandau(W + 0.5*dt*k2, h, c1, c2, nu)
+        k4 = fGinzburgLandau(W +     dt*k3, h, c1, c2, nu)
+        rhs = (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0
+        
+        # Actual time-stepping
+        W = W + dt*rhs
 
     return W
+
 
 # I assume a [0,1] x [0,1] grid with 256 grid points in each direction
 # with positive (real and imaginary) random initial conditions (can be changed later)
@@ -60,7 +88,7 @@ def runGinzburgLandau():
 
     rng = rd.RandomState()
     W0 = rng.uniform(low=0.0, high=1.0, size=(M,M)) + rng.uniform(low=0.0, high=1.0, size=(M,M))*1j
-    W = integrateComplexPDE(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
+    W = integrateGinzburgLandauEuler(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
 
     np.save('Ginzburg_Landau.npy', W)
 
