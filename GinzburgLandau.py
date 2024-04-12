@@ -1,0 +1,88 @@
+import numpy as np
+import numpy.linalg as lg
+import numpy.random as rd
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
+
+"""
+This function integrates the 2-dimensional complex Ginzburg-Landau
+equations. We assume periodic boundaries on the domain [0,1]x[0,1].
+"""
+def integrateComplexPDE(W0, h, M, dt, Tf, params, tol=0.1):
+    c1 = params['c1']
+    c2 = params['c2']
+    nu = params['nu']
+
+    # Do time-integration
+    W = np.copy(W0)
+    T = 0.0
+    n_print = 0.01
+    while T < Tf:
+        if T > n_print:
+            print('\nt =', T, 'dt =', dt, np.average(W))
+            n_print += 0.01
+
+        # Compute spatial second derivatives - can be faster than double-loop implementation
+        dWdx = (np.roll(W, 1, axis=1) - 2.0*W + np.roll(W, -1, axis=1)) / h**2
+        dWdy = (np.roll(W, 1, axis=0) - 2.0*W + np.roll(W, -1, axis=0)) / h**2
+        laplacian = dWdx + dWdy
+        modl = np.square(np.abs(W))
+        prod_term = np.multiply(modl, W)
+
+        # Compute right-hand side
+        rhs = W + (1.0 + c1*1j) * laplacian \
+                - (1.0 + c2*1j) * prod_term \
+                - (1.0 + nu*1j) * np.average(W) \
+                + (1.0 + c2*1j) * np.average(prod_term)
+
+        # Euler time-stepping
+        while True:
+            if lg.norm(dt*rhs / (M*M), ord=np.inf) > tol:
+                dt = 0.5*dt
+            else:
+                W = W + dt*rhs
+                T = T + dt
+                dt = 1.2*dt
+                break
+
+
+    return W
+
+# I assume a [0,1] x [0,1] grid with 256 grid points in each direction
+# with positive (real and imaginary) random initial conditions (can be changed later)
+def runGinzburgLandau():
+    params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5}
+    dt = 1.e-6   # chosen for stability
+    M = 256      # from run_2d.py
+    h = 1.0 / M  # from run_2d.py
+    T = 10       # No reason at all
+
+    rng = rd.RandomState()
+    W0 = rng.uniform(low=0.0, high=1.0, size=(M,M)) + rng.uniform(low=0.0, high=1.0, size=(M,M))*1j
+    W = integrateComplexPDE(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
+
+    np.save('Ginzburg_Landau.npy', W)
+
+def plotGinzburgLandau(W):
+    angles = np.angle(W)
+    cmap = cm.gist_rainbow
+
+    color_map = cmap(angles / (2.0*np.pi))
+    grid = np.linspace(0.0, 1.0, 256)
+    X2, Y2 = np.meshgrid(grid, grid)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(121, projection='3d')
+    ax.plot_surface(X2, Y2, np.absolute(W), facecolors=color_map, alpha=1, shade=False, rstride=1, cstride=1)
+    ax.set_xlabel(r'$x$')
+    ax.set_ylabel(r'$y$')
+    ax.set_zlabel(r'$|W|$')
+    plt.show()
+
+if __name__ == '__main__':
+    try:
+        W = np.load('Ginzburg_Landau.npy')
+        plotGinzburgLandau(W)
+    except:
+        runGinzburgLandau()

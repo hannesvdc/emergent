@@ -28,6 +28,7 @@ def main_amp():
     plt.show()
 
     (T, N, N) = A.shape
+    print(T, N)
     tt = np.linspace(20000, 21000, T)
     xx = np.linspace(0, 400, N)
     X, Y = np.meshgrid(xx, xx)
