@@ -22,6 +22,7 @@ def main_amp():
     ax = fig.add_subplot(111)
     ax.pcolor(np.abs(A[-1]))
     ax.set_xlabel('x')
+    ax.set_title('Run 2D')
 
     ax.set_ylabel('y')
     plt.savefig('')

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import numpy.linalg as lg
 import numpy.random as rd
@@ -44,7 +46,7 @@ def integrateGinzburgLandauEuler(W0: np.ndarray,
             print('\nt =', T, 'dt =', dt, np.average(W))
             n_print += 0.01
             print('Storing T =', T)
-            time_evolution.append((T, np.copy(W)))
+            time_evolution.append((round(T, 4), np.copy(W)))
 
         # Euler time-stepping
         rhs = fGinzburgLandau(W, h, c1, c2, nu)
@@ -86,37 +88,45 @@ def integrateGinzburgLandauRK4(W0: np.ndarray, h: float, M: int, dt: float, Tf: 
 
 # I assume a [0,1] x [0,1] grid with 256 grid points in each direction
 # with positive (real and imaginary) random initial conditions (can be changed later)
-def runGinzburgLandau():
+def runGinzburgLandau(T=10.0):
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5}
     dt = 1.e-6   # chosen for stability (RK$ 5.e-6)
     M = 256      # from run_2d.py
     h = 1.0 / M  # from run_2d.py
-    T = 10.0     # No reason at all
 
     rng = rd.RandomState()
     W0 = rng.uniform(low=0.0, high=1.0, size=(M,M)) + rng.uniform(low=0.0, high=1.0, size=(M,M))*1j
     W, time_evolution = integrateGinzburgLandauEuler(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
     print(W)
 
+    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
     for n in range(len(time_evolution)):
         t = time_evolution[n][0]
-        np.save('simulation_data/Ginzburg_Landau_Euler_T='+str(t)+'.npy', time_evolution[n][1])
+        np.save(directory + 'Ginzburg_Landau_Euler_T='+str(t)+'.npy', time_evolution[n][1])
 
-def plotGinzburgLandau(W):
-    angles = np.angle(W)
-    cmap = cm.gist_rainbow
-
-    color_map = cmap(angles / (2.0*np.pi))
-    grid = np.linspace(0.0, 1.0, 256)
-    X2, Y2 = np.meshgrid(grid, grid)
+def plotGinzburgLandau():
+    def parseT(filename):
+        index = filename.find('T=')
+        index2 = filename.find('.npy')
+        return float(filename[index+2:index2])
+    
+    # Load Data
+    T = 10.0; min_dist = np.inf
+    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
+    for filename in os.scandir(directory):
+        if not filename.is_file():
+            continue
+        T_file = parseT(filename.name)
+        if np.abs(T_file - T) < min_dist:
+            min_dist = np.abs(T_file - T)
+            W = np.load(directory + filename.name)
 
     fig = plt.figure()
-    ax = fig.add_subplot(121, projection='3d')
-    ax.plot_surface(X2, Y2, np.absolute(W), facecolors=color_map, shade=False)
+    ax = fig.add_subplot(111)
+    ax.pcolor(np.abs(W))
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
-    ax.set_zlabel(r'$|W|$')
     plt.show()
 
 if __name__ == '__main__':
-    runGinzburgLandau()
+    runGinzburgLandau(T=100.0)
