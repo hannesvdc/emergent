@@ -38,11 +38,13 @@ def integrateGinzburgLandauEuler(W0: np.ndarray,
     W = np.copy(W0)
     T = 0.0
     n_print = 0.01
-    time_evolution = [(T, W)]
+    time_evolution = [(T, np.copy(W))]
     while T < Tf:
         if T > n_print:
             print('\nt =', T, 'dt =', dt, np.average(W))
             n_print += 0.01
+            print('Storing T =', T)
+            time_evolution.append((T, np.copy(W)))
 
         # Euler time-stepping
         rhs = fGinzburgLandau(W, h, c1, c2, nu)
@@ -54,7 +56,6 @@ def integrateGinzburgLandauEuler(W0: np.ndarray,
                 T = T + dt
                 dt = 1.2*dt
                 break
-        time_evolution.append((T, W))
 
     return W, time_evolution
 
@@ -118,8 +119,4 @@ def plotGinzburgLandau(W):
     plt.show()
 
 if __name__ == '__main__':
-    try:
-        W = np.load('Ginzburg_Landau.npy')
-        plotGinzburgLandau(W)
-    except:
-        runGinzburgLandau()
+    runGinzburgLandau()
