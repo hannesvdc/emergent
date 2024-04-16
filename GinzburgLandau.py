@@ -1,190 +1,170 @@
 import os
 import cv2
+import argparse
+import warnings
+warnings.filterwarnings("ignore")
 
 import numpy as np
-import numpy.linalg as lg
-import numpy.random as rd
+import numpy.fft as fft
 import matplotlib.pyplot as plt
 from matplotlib import cm
+
+import int.mcgle_2d as mcgle
 
 def parseT(filename, ext='.npy'):
     index = filename.find('T=')
     index2 = filename.find(ext)
     return float(filename[index+2:index2])
 
-def fGinzburgLandau(W, h, c1, c2, nu):
-    dWdx = (np.roll(W, 1, axis=1) - 2.0*W + np.roll(W, -1, axis=1)) / h**2
-    dWdy = (np.roll(W, 1, axis=0) - 2.0*W + np.roll(W, -1, axis=0)) / h**2
-    laplacian = dWdx + dWdy
-    modl = np.square(np.abs(W))
-    prod_term = np.multiply(modl, W)
-
-    # Compute right-hand side
-    rhs = W + (1.0 + c1*1j) * laplacian \
-            - (1.0 + c2*1j) * prod_term \
-            - (1.0 + nu*1j) * np.average(W) \
-            + (1.0 + c2*1j) * np.average(prod_term)
-    
-    return rhs
-
-"""
-This function integrates the 2-dimensional complex Ginzburg-Landau
-equations. We assume periodic boundaries on the domain [0,1]x[0,1].
-"""
-def integrateGinzburgLandauEuler(W0: np.ndarray, 
-                                 h: float, 
-                                 M:int, 
-                                 dt: float,
-                                 Tf: float, 
-                                 params: dict, 
-                                 tol=0.1):
+def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
+    assert M % 2 == 0
     c1 = params['c1']
     c2 = params['c2']
     nu = params['nu']
-
-    # Do time-integration
-    W = np.copy(W0)
-    T = 0.0
-    n_print = 0.01
-    time_evolution = [(T, np.copy(W))]
-    while T < Tf:
-        if T > n_print:
-            print('\nt =', T, 'dt =', dt, np.average(W))
-            n_print += 0.01
-            print('Storing T =', T)
-            time_evolution.append((round(T, 4), np.copy(W)))
-
-        # Euler time-stepping
-        rhs = fGinzburgLandau(W, h, c1, c2, nu)
-        while True:
-            if lg.norm(dt*rhs / (M*M), ord=np.inf) > tol:
-                dt = 0.5*dt
-            else:
-                W = W + dt*rhs
-                T = T + dt
-                dt = 1.2*dt
-                break
-
-    return W, time_evolution
-
-"""
-This function integrates the 2-dimensional complex Ginzburg-Landau
-equations. We assume periodic boundaries on the domain [0,1]x[0,1].
-"""
-def integrateGinzburgLandauRK4(W0: np.ndarray, h: float, M: int, dt: float, Tf: float, params: dict):
-    c1 = params['c1']
-    c2 = params['c2']
-    nu = params['nu']
-
-    # Do time-integration
-    W = np.copy(W0)
     N = int(np.ceil(Tf / dt))
-    n_print = 0.001
-    time_evolution = [(0.0, np.copy(W))]
+
+    # Frequency Space
+    #Lp = 2.0 * L
+    k = np.concatenate((np.arange(M / 2 + 1), np.arange(-M / 2 + 1, 0))) * 2.0 * np.pi / Lp # DC at 0, k > 0 first, then f < 0
+    print('OWN k =', k)
+    k2 = k**2
+    kX, kY = np.meshgrid(k2, k2)
+
+    # Linear Terms corresponding to W and (1 + 1c_1) nabla**2 W
+    cA = 1.0 - (1.0 + c1*1j) * (kX + kY)
+    cA[0,0] = -nu*1j # Subtract spatial average in DC component (<W(t=0)> = 1)
+    print('OWN cA =', cA)
+    expA = np.exp(dt * cA)
+    print('OWN expA =', expA)
+
+    # Nonlinear factor terms for ETD2 method
+    nl_fac_A  = (expA * (1.0 + 1.0 / (cA * dt)) - 1.0 / (cA * dt) - 2.0) / cA
+    nl_fac_Ap = (expA * (-1.0 / (cA * dt))      + 1.0 / (cA * dt) + 1.0) / cA
+    print('OWN nlfacA', nl_fac_A)
+    print('OWN nlfacAp',nl_fac_Ap)
+
+    # Do PDE Timestepping
+    W = np.copy(W0)
+    A = fft.fft2(W)
+    print('OWN W =',W)
     for n in range(N):
-        T = n*dt
-        if T >= n_print:
-            print('\nt =', round(T, 4), 'dt =', dt, np.average(W))
-            print('Storing T =', round(T, 4))
-            n_print += 0.001
-            time_evolution.append((round(T, 4), np.copy(W)))
+        if n % 100 == 0:
+            print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)))
 
-        # RK4 Temporary variables
-        k1 = fGinzburgLandau(W,             h, c1, c2, nu)
-        k2 = fGinzburgLandau(W + 0.5*dt*k1, h, c1, c2, nu)
-        k3 = fGinzburgLandau(W + 0.5*dt*k2, h, c1, c2, nu)
-        k4 = fGinzburgLandau(W +     dt*k3, h, c1, c2, nu)
-        rhs = (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0
-        
-        # Actual time-stepping
-        W = W + dt*rhs
+        # Calculation of nonlinear part in Fourier space
+        nlA = -(1 + c2 * 1j) * fft.fft2(W * np.absolute(W)**2)
+        nlA[0, 0] = 0 # Subtract DC component
+        if n == 0:
+            nlAp = np.copy(nlA)
 
-    return W, time_evolution
+        # Actual Timestepping
+        A = expA[:,:] * A[:,:] + nl_fac_A[:,:] * nlA[:,:] + nl_fac_Ap[:,:] * nlAp[:,:]
+        W = fft.ifft2(A)
+
+        # Update variables for next iteration. Can be with refrence because a new nlA is created every iteration
+        nlAp = nlA
+
+    return W
 
 
-# I assume a [0,1] x [0,1] grid with 256 grid points in each direction
-# with positive (real and imaginary) random initial conditions (can be changed later)
+
+""" I assume a [0,1] x [0,1] grid with 256 grid points in each direction
+    with positive (real and imaginary) random initial conditions (can be changed later)
+"""
 def runGinzburgLandau():
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5}
-    dt = 1.e-6   # chosen for stability (RK$ 5.e-6)
-    M = 256      # from run_2d.py
-    h = 1.0 / M  # from run_2d.py
-    T = 10.0
+    dt = 0.05    # See [https://arxiv.org/pdf/1503.04053.pdf, Figure 1(c)]
+    M = 512      # from run_2d.py
+    L = 400.0    # from run_2d.py
+    T = 2500.0
     eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation (2)]
 
-    rng = rd.RandomState()
-    W0 = rng.uniform(low=0.0, high=1.0, size=(M,M)) + rng.uniform(low=0.0, high=1.0, size=(M,M))*1j
-    #W0 = rng.uniform(low=0.0, high=2.0*eta, size=(M,M)) + rng.uniform(low=-1.0, high=1.0, size=(M,M))*1j # <W0> = eta?
-    W, time_evolution = integrateGinzburgLandauRK4(W0=W0, h=h, M=M, dt=dt, Tf=T, params=params)
+    Lp = 2.0*L
+    W0 = mcgle.create_initial_conditions("plain_rand", Lp, M, eta)
+    print('Averaged Initial', np.mean(W0))
+    W = integrateGinzburgLandauETD2(W0=W0, Lp=Lp, M=M, dt=dt, Tf=T, params=params)
     print(W)
 
-    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
-    for n in range(len(time_evolution)):
-        t = time_evolution[n][0]
-        np.save(directory + 'Ginzburg_Landau_Euler_T='+str(t)+'.npy', time_evolution[n][1])
+    plotGinzburgLandau(W)
+    #directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
+    #for n in range(len(time_evolution)):
+    #    t = time_evolution[n][0]
+    #    np.save(directory + 'Ginzburg_Landau_RK4_T='+str(t)+'.npy', time_evolution[n][1])
 
-def plotGinzburgLandau():
+def plotGinzburgLandau(W):
     # Load Data
-    T = 10.0; min_dist = np.inf
-    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
-    for filename in os.scandir(directory):
-        if not filename.is_file():
-            continue
-        T_file = parseT(filename.name)
-        if np.abs(T_file - T) < min_dist:
-            min_dist = np.abs(T_file - T)
-            W = np.load(directory + filename.name)
+    x = np.arange(W.shape[0])
+    X2, Y2 = np.meshgrid(x, x)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.pcolor(np.abs(W))
+    ax.pcolor(X2, Y2, np.absolute(W))
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
+    ax.set_title('Reproduced Chimera')
     plt.show()
 
 def storeImages():
+    def dot_to_bar(string):
+        return string.replace(".","_")
     # Load Data
     data = []
-    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_old/'
-    for filename in os.scandir(directory):
+    data_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
+    store_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Images/'
+    min_angle = 2.0
+    max_angle = 0.0
+    for filename in os.scandir(data_directory):
         if not filename.is_file() or not filename.name.endswith('.npy'):
             continue
         T = parseT(filename.name)
-        W = np.load(directory + filename.name)
+        W = np.load(data_directory + filename.name)
         data.append((T,W))
+        if T > 1.0:
+            min_angle = min(min_angle, np.min(np.angle(W)) + np.pi)
+            max_angle = max(max_angle, np.max(np.angle(W)) + np.pi)
+        print(np.var(W.flatten()))
     data.sort()
+    print(min_angle, max_angle)
+    return
 
+    M = data[0][1].shape[0]
+    x_grid = np.linspace(0.0, 1.0, M)
+    y_grid = np.linspace(0.0, 1.0, M)
+    X2, Y2 = np.meshgrid(x_grid, y_grid)
     for n in range(len(data)):
         t = data[n][0]
         W = data[n][1]
-        print('t =', t)
+        phi = np.angle(W) + np.pi
+        print('t =', t, np.min(phi), np.max(phi))
 
         _ = plt.figure()
-        plt.pcolor(np.abs(W) / np.max(np.abs(W)))
+        plt.pcolor(X2, Y2, phi / (2.0*np.pi), vmin=0.0, vmax=1.0, cmap=cm.gist_rainbow)
         plt.xlabel(r'$x$')
         plt.ylabel(r'$y$')
         plt.title(r'$T = $'+str(t))
-        plt.savefig(directory + 'GL_T='+str(round(t,4))+'.png')
+        plt.savefig(store_directory + 'GL_T='+dot_to_bar(str(round(t,4)))+'.png')
         plt.close()
 
 def makeMovie():
-    image_folder = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_old/'
+    def bar_to_dot(string):
+        return string.replace("_", ".")
+    image_folder = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Images/'
     video_name = 'Ginzburg_Landau.avi'
 
     images = []
     for img in os.listdir(image_folder):
         if not img.endswith('.png') or not img.startswith('GL'):
             continue
-        T = parseT(img, ext='.png')
+        T = parseT(bar_to_dot(img), ext='.png')
         images.append((T, img))
     images.sort()
         
-    #images = [img for img in os.listdir(image_folder) if img.endswith(".png") and img.startswith('GL')]
+    images = [img for img in os.listdir(image_folder) if img.endswith(".png") and img.startswith('Ginzburg_Landau')]
     frame = cv2.imread(os.path.join(image_folder, images[0][1]))
     height, width, layers = frame.shape
 
     fps = 10
-    video = cv2.VideoWriter(video_name, 0, fps, (width,height))
+    video = cv2.VideoWriter(image_folder + video_name, 0, fps, (width,height))
 
     for image in images:
         video.write(cv2.imread(os.path.join(image_folder, image[1])))
@@ -193,4 +173,22 @@ def makeMovie():
     video.release()
 
 if __name__ == '__main__':
-    runGinzburgLandau()
+    def parseArguments():
+        parser = argparse.ArgumentParser(description='Input for the Ginzburg-Landau PDE Solver.')
+        parser.add_argument('--type', type=str, nargs='?', dest='run_type', help="""Which type of experiment to run.\n
+                            \tpde: Run the 2-dimensional Ginzburg-Landau PDE,\n
+                            \tvideo: Make a (x,y,t) video based on the simulation data,\n
+                            \thist: Make emergent-space video.
+                            """)
+        return parser.parse_args()
+
+    args = parseArguments()
+    if args.run_type == 'pde':
+        runGinzburgLandau()
+    elif args.run_type == 'video':
+        storeImages()
+        makeMovie()
+    elif args.run_type == 'hist':
+        print('This type of experiment is currently not supported.')
+    else:
+        print('Type of experiment not recognized. Returning.')

@@ -24,6 +24,8 @@ def create_initial_conditions(ic, Lp, N, eta):
     print("Creating initial conditions (" + ic + ").")
     binsp = (Lp / N) * np.arange(-N / 2, N / 2)
     Xp, Yp = np.meshgrid(binsp, binsp)
+    np.random.seed(100)
+
     if ic == 'pulse':
         A = 0.5 + 0.5 * (1 / np.cosh((Xp**2 + Yp**2) * 0.2)) + \
             10**(-2) * np.random.randn(len(Xp), len(Yp))
@@ -150,6 +152,7 @@ def integrate(dynamics='type 1', c1=0.0, c2=0.0, nu=0.0, eta=0.0,
 
     # Set of wavenumbers
     k = np.concatenate((np.arange(N / 2 + 1), np.arange(-N / 2 + 1, 0))) * 2 * np.pi / Lp
+    print('REF k =', k)
     k2 = k**2
     k2X, k2Y = np.meshgrid(k2, k2)
 
@@ -213,16 +216,22 @@ def integrate(dynamics='type 1', c1=0.0, c2=0.0, nu=0.0, eta=0.0,
     cA = 1 - (k2X + k2Y) * (1 + c1 * 1j)
     # Homogeneous mode
     cA[0, 0] = -nu * 1j
+    print('REF cA =', cA)
     expA = np.exp(dt * cA)
+    print('REF expA =', expA)
     nlfacA = (np.exp(dt * cA) * (1 + 1 / (cA * dt)) - 1 / (cA * dt) - 2) / cA
     nlfacAp = (np.exp(dt * cA) * (-1 / (cA * dt)) + 1 / (cA * dt) + 1) / cA
+    print('REF nlfacA', nlfacA)
+    print('REF nlfacAp',nlfacAp)
 
     # Solve PDE
+    print('REF A =',A)
     for i in np.arange(1, nmax + 1):
         # Calculation of nonlinear part in Fourier space
         nlA = -(1 + c2 * 1j) * pl.fft2(A * abs(A)**2)
         # Homogeneous mode
         nlA[0, 0] = 0
+        print('REF nlA', nlA)
 
         # Setting the first values of the previous nonlinear coefficients
         if i == 1:
@@ -243,9 +252,11 @@ def integrate(dynamics='type 1', c1=0.0, c2=0.0, nu=0.0, eta=0.0,
             # rest...
             A_hat[int(N / 2 + 1):N, :][::2, :] = -A_hat[1:int(N / 2), :][::-1, :][::2, :]
             A_hat[int(N / 2 + 2):N, :][::2, :] = A_hat[1:int(N / 2 - 1), :][::-1, :][::2, :]
+            print(A_hat.shape)
         elif bc == 'periodic':
             # Time-stepping (carried out in parallel for each individual Fourier mode)
             A_hat[:] = A_hat[:] * expA[:] + nlfacA[:] * nlA[:] + nlfacAp[:] * nlAp[:]
+            #print(A_hat.shape)
 
         A = pl.ifft2(A_hat)
         nlAp = nlA

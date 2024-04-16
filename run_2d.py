@@ -14,7 +14,7 @@ def main_amp():
         A = np.load('data/mcgle_data.npy')
     except:
         print('Simulating MCGLE.')
-        Ad = mint.integrate(L=400, N=512, tmin=2000, tmax=2500)
+        Ad = mint.integrate(L=400, N=512, tmin=2000, tmax=2500, bc='periodic')
         A = Ad["data"]
         np.save('data/mcgle_data.npy', A)
 
@@ -123,7 +123,7 @@ def main_phase():
         A = np.load('data/mcgle_data.npy')
     except:
         print('Simulating MCGLE.')
-        Ad = mint.integrate()
+        Ad = mint.integrate(bc='periodic')
         A = Ad["data"]
         np.save('data/mcgle_data.npy', A)
 
