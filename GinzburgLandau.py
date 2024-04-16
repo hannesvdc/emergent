@@ -9,12 +9,35 @@ import numpy.fft as fft
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-import int.mcgle_2d as mcgle
-
 def parseT(filename, ext='.npy'):
     index = filename.find('T=')
     index2 = filename.find(ext)
     return float(filename[index+2:index2])
+
+def create_initial_conditions(ic, Lp, N, eta):
+    """Specify initial conditions for zero-flux boundary conditions."""
+    binsp = (Lp / N) * np.arange(-N / 2, N / 2)
+    Xp, Yp = np.meshgrid(binsp, binsp)
+
+    if ic == 'pulse':
+        A = 0.5 + 0.5 * (1 / np.cosh((Xp**2 + Yp**2) * 0.2)) + \
+            10**(-2) * np.random.randn(len(Xp), len(Yp))
+        A = (A * N**2 / np.sum(A)) * eta
+    if ic == 'sine1D':
+        A = 0.01 * np.sin(2 * np.pi * 40 * Yp / Lp) + 0.5
+        A = (A * N**2 / np.sum(A)) * eta
+    if ic == 'sine2D':
+        A = 0.01 * np.sin(2 * np.pi * 40 * Xp / Lp) + 0.01 * np.sin(2 * np.pi * 40 * Yp / Lp) + 0.5
+        A = (A * N**2 / np.sum(A)) * eta
+    if ic == 'plain':
+        A = Xp * 0.0 + 0.5
+        A = (A * N**2 / np.sum(A)) * eta
+    if ic == 'plain_rand':
+        A = Xp * 0.0 + 0.5
+        A[:int(N / 4), :] = A[:int(N / 4), :] + 0.01 * \
+            np.reshape(np.random.randn(int(N / 4 * N)), (int(N / 4), N))
+        A = (A * N**2 / np.sum(A)) * eta
+    return A
 
 def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     assert M % 2 == 0
@@ -24,29 +47,22 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     N = int(np.ceil(Tf / dt))
 
     # Frequency Space
-    #Lp = 2.0 * L
     k = np.concatenate((np.arange(M / 2 + 1), np.arange(-M / 2 + 1, 0))) * 2.0 * np.pi / Lp # DC at 0, k > 0 first, then f < 0
-    print('OWN k =', k)
     k2 = k**2
     kX, kY = np.meshgrid(k2, k2)
 
     # Linear Terms corresponding to W and (1 + 1c_1) nabla**2 W
     cA = 1.0 - (1.0 + c1*1j) * (kX + kY)
     cA[0,0] = -nu*1j # Subtract spatial average in DC component (<W(t=0)> = 1)
-    print('OWN cA =', cA)
     expA = np.exp(dt * cA)
-    print('OWN expA =', expA)
 
     # Nonlinear factor terms for ETD2 method
     nl_fac_A  = (expA * (1.0 + 1.0 / (cA * dt)) - 1.0 / (cA * dt) - 2.0) / cA
     nl_fac_Ap = (expA * (-1.0 / (cA * dt))      + 1.0 / (cA * dt) + 1.0) / cA
-    print('OWN nlfacA', nl_fac_A)
-    print('OWN nlfacAp',nl_fac_Ap)
 
     # Do PDE Timestepping
     W = np.copy(W0)
     A = fft.fft2(W)
-    print('OWN W =',W)
     for n in range(N):
         if n % 100 == 0:
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)))
@@ -67,7 +83,6 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     return W
 
 
-
 """ I assume a [0,1] x [0,1] grid with 256 grid points in each direction
     with positive (real and imaginary) random initial conditions (can be changed later)
 """
@@ -76,12 +91,11 @@ def runGinzburgLandau():
     dt = 0.05    # See [https://arxiv.org/pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
-    T = 2500.0
+    T = 2500.0   # Need large enough timeframe for chimera's to form
     eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation (2)]
 
     Lp = 2.0*L
     W0 = mcgle.create_initial_conditions("plain_rand", Lp, M, eta)
-    print('Averaged Initial', np.mean(W0))
     W = integrateGinzburgLandauETD2(W0=W0, Lp=Lp, M=M, dt=dt, Tf=T, params=params)
     print(W)
 
@@ -101,7 +115,7 @@ def plotGinzburgLandau(W):
     ax.pcolor(X2, Y2, np.absolute(W))
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
-    ax.set_title('Reproduced Chimera')
+    ax.set_title('Type I Chimera')
     plt.show()
 
 def storeImages():

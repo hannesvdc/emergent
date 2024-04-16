@@ -24,7 +24,7 @@ def create_initial_conditions(ic, Lp, N, eta):
     print("Creating initial conditions (" + ic + ").")
     binsp = (Lp / N) * np.arange(-N / 2, N / 2)
     Xp, Yp = np.meshgrid(binsp, binsp)
-    np.random.seed(100)
+    #np.random.seed(100)
 
     if ic == 'pulse':
         A = 0.5 + 0.5 * (1 / np.cosh((Xp**2 + Yp**2) * 0.2)) + \
