@@ -95,7 +95,7 @@ def runGinzburgLandau():
     eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation (2)]
 
     Lp = 2.0*L
-    W0 = mcgle.create_initial_conditions("plain_rand", Lp, M, eta)
+    W0 = create_initial_conditions("plain_rand", Lp, M, eta)
     W = integrateGinzburgLandauETD2(W0=W0, Lp=Lp, M=M, dt=dt, Tf=T, params=params)
     print(W)
 
