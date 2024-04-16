@@ -63,9 +63,11 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     # Do PDE Timestepping
     W = np.copy(W0)
     A = fft.fft2(W)
+    temporal_evolution = list()
     for n in range(N):
         if n % 100 == 0:
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)))
+            temporal_evolution.append((n*dt, W))
 
         # Calculation of nonlinear part in Fourier space
         nlA = -(1 + c2 * 1j) * fft.fft2(W * np.absolute(W)**2)
@@ -80,7 +82,8 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
         # Update variables for next iteration. Can be with refrence because a new nlA is created every iteration
         nlAp = nlA
 
-    return W
+    temporal_evolution.append((Tf, W))
+    return W, temporal_evolution
 
 
 """ I assume a [0,1] x [0,1] grid with 256 grid points in each direction
@@ -93,17 +96,24 @@ def runGinzburgLandau():
     L = 400.0    # from run_2d.py
     T = 2500.0   # Need large enough timeframe for chimera's to form
     eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation (2)]
+    storeSolution = False
 
     Lp = 2.0*L
     W0 = create_initial_conditions("plain_rand", Lp, M, eta)
-    W = integrateGinzburgLandauETD2(W0=W0, Lp=Lp, M=M, dt=dt, Tf=T, params=params)
+    W, temporal_evolution = integrateGinzburgLandauETD2(W0=W0, 
+                                                        Lp=Lp, 
+                                                        M=M, 
+                                                        dt=dt, 
+                                                        Tf=T, 
+                                                        params=params)
     print(W)
 
     plotGinzburgLandau(W)
-    #directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
-    #for n in range(len(time_evolution)):
-    #    t = time_evolution[n][0]
-    #    np.save(directory + 'Ginzburg_Landau_RK4_T='+str(t)+'.npy', time_evolution[n][1])
+    if storeSolution:
+        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
+        for n in range(len(temporal_evolution)):
+            t = temporal_evolution[n][0]
+            np.save(directory + 'Ginzburg_Landau_ETD2_T='+str(t)+'.npy', temporal_evolution[n][1])
 
 def plotGinzburgLandau(W):
     # Load Data
