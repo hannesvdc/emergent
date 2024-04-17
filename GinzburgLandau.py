@@ -14,10 +14,12 @@ def parseT(filename, ext='.npy'):
     index2 = filename.find(ext)
     return float(filename[index+2:index2])
 
-def create_initial_conditions(ic, Lp, N, eta):
+def create_initial_conditions(ic, Lp, N, eta, seed=None):
     """Specify initial conditions for zero-flux boundary conditions."""
     binsp = (Lp / N) * np.arange(-N / 2, N / 2)
     Xp, Yp = np.meshgrid(binsp, binsp)
+    if seed is not None:
+        np.random.seed(seed)
 
     if ic == 'pulse':
         A = 0.5 + 0.5 * (1 / np.cosh((Xp**2 + Yp**2) * 0.2)) + \
@@ -67,7 +69,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     for n in range(N):
         if n % 100 == 0:
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)))
-            temporal_evolution.append((n*dt, W))
+            temporal_evolution.append((n*dt, np.copy(W)))
 
         # Calculation of nonlinear part in Fourier space
         nlA = -(1 + c2 * 1j) * fft.fft2(W * np.absolute(W)**2)
@@ -82,7 +84,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
         # Update variables for next iteration. Can be with refrence because a new nlA is created every iteration
         nlAp = nlA
 
-    temporal_evolution.append((Tf, W))
+    temporal_evolution.append((Tf, np.copy(W)))
     return W, temporal_evolution
 
 
@@ -97,9 +99,10 @@ def runGinzburgLandau():
     T = 2500.0   # Need large enough timeframe for chimera's to form
     eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation (2)]
     storeSolution = False
+    seed = 100
 
     Lp = 2.0*L
-    W0 = create_initial_conditions("plain_rand", Lp, M, eta)
+    W0 = create_initial_conditions("plain_rand", Lp, M, eta, seed=seed)
     W, temporal_evolution = integrateGinzburgLandauETD2(W0=W0, 
                                                         Lp=Lp, 
                                                         M=M, 
@@ -135,34 +138,31 @@ def storeImages():
     data = []
     data_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau/'
     store_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Images/'
-    min_angle = 2.0
-    max_angle = 0.0
+    min_mod = 2.0
+    max_mod = 0.0
     for filename in os.scandir(data_directory):
         if not filename.is_file() or not filename.name.endswith('.npy'):
             continue
         T = parseT(filename.name)
         W = np.load(data_directory + filename.name)
         data.append((T,W))
-        if T > 1.0:
-            min_angle = min(min_angle, np.min(np.angle(W)) + np.pi)
-            max_angle = max(max_angle, np.max(np.angle(W)) + np.pi)
-        print(np.var(W.flatten()))
+        min_mod = min(min_mod, np.min(np.absolute(W)))
+        max_mod = max(max_mod, np.max(np.absolute(W)))
     data.sort()
-    print(min_angle, max_angle)
-    return
+    print(min_mod, max_mod)
 
-    M = data[0][1].shape[0]
+    M = 512
     x_grid = np.linspace(0.0, 1.0, M)
     y_grid = np.linspace(0.0, 1.0, M)
     X2, Y2 = np.meshgrid(x_grid, y_grid)
     for n in range(len(data)):
         t = data[n][0]
         W = data[n][1]
-        phi = np.angle(W) + np.pi
-        print('t =', t, np.min(phi), np.max(phi))
+        phi = np.absolute(W)
+        print('t =', t)
 
         _ = plt.figure()
-        plt.pcolor(X2, Y2, phi / (2.0*np.pi), vmin=0.0, vmax=1.0, cmap=cm.gist_rainbow)
+        plt.pcolor(X2, Y2, phi, vmin=min_mod, vmax=max_mod)
         plt.xlabel(r'$x$')
         plt.ylabel(r'$y$')
         plt.title(r'$T = $'+str(t))
@@ -183,7 +183,6 @@ def makeMovie():
         images.append((T, img))
     images.sort()
         
-    images = [img for img in os.listdir(image_folder) if img.endswith(".png") and img.startswith('Ginzburg_Landau')]
     frame = cv2.imread(os.path.join(image_folder, images[0][1]))
     height, width, layers = frame.shape
 
@@ -210,7 +209,7 @@ if __name__ == '__main__':
     if args.run_type == 'pde':
         runGinzburgLandau()
     elif args.run_type == 'video':
-        storeImages()
+        #storeImages()
         makeMovie()
     elif args.run_type == 'hist':
         print('This type of experiment is currently not supported.')
