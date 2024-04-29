@@ -48,6 +48,8 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
         A = (A * N**2 / np.sum(A)) * eta
     if ic == 'rand':
         A = np.random.randn(N,N) + 1j*np.random.randn(N,N) - 1j
+    if ic == 'swarm':
+        pass
     return A
 
 def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
@@ -110,7 +112,7 @@ def runGinzburgLandau():
     seed = 100
 
     Lp = 2.0*L
-    W0 = create_initial_conditions("plain_rand", Lp, M, eta, seed=seed) # (original plain_rand)
+    W0 = create_initial_conditions("plain_rand", Lp, M, eta, seed=seed) # original "plain_rand"
     print(np.absolute(np.mean(W0)))
     W, temporal_evolution = integrateGinzburgLandauETD2(W0=W0, 
                                                         Lp=Lp, 
