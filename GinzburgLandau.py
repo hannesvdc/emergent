@@ -55,8 +55,10 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
         A = sc.ndimage.filters.gaussian_filter(A, sigma, mode='constant')
     return A
 
-def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
+def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
     assert M % 2 == 0
+    print('Number of Mb', (Tf-T_min_store)/dt*512*8 / 10**6)
+
     c1 = params['c1']
     c2 = params['c2']
     nu = params['nu']
@@ -80,10 +82,16 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
     W = np.copy(W0)
     A = fft.fft2(W)
     temporal_evolution = list()
+    temporal_slices = np.zeros((int((Tf - T_min_store)/dt), W.shape[1]), dtype=complex); print(temporal_slices.size)
+    slice_counter = 0
     for n in range(N):
         if n % 100 == 0:
+            temporal_evolution.append((n*dt, W))
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)), np.min(np.angle(W)+np.pi), np.max(np.angle(W)+np.pi))
-            temporal_evolution.append((n*dt, np.copy(W)))
+        if n * dt >= T_min_store:
+            temporal_slices[slice_counter,:] = W[100,:]
+            slice_counter += 1
+
         # Calculation of nonlinear part in Fourier space
         nlA = -(1 + c2 * 1j) * fft.fft2(W * np.absolute(W)**2)
         nlA[0, 0] = 0 # Subtract DC component
@@ -97,52 +105,78 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params):
         # Update variables for next iteration. Can be with refrence because a new nlA is created every iteration
         nlAp = nlA
 
-    temporal_evolution.append((Tf, np.copy(W)))
-    return W, temporal_evolution
+    temporal_evolution.append((Tf, W))
+    temporal_slices[-1,:] = W[100,:]
+    return W, temporal_evolution, temporal_slices
 
 
 """ I assume a [0,1] x [0,1] grid with 256 grid points in each direction
     with positive (real and imaginary) random initial conditions (can be changed later)
 """
-def runGinzburgLandau(directory=None):
-    params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5}
-    dt = 0.01    # See [https://arxiv.org/pdf/1503.04053.pdf, Figure 1(c)]
+def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, directory=None):
+    dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
     T = 2500.0   # Need large enough timeframe for chimeras to form
-    eta = 1.0    # See [https://arxiv.org/pdf/1503.04053.pdf, equation 2]
     seed = 100
 
     Lp = 2.0*L
-    W0 = create_initial_conditions("swarm", Lp, M, eta, seed=seed) # original "plain_rand"
-    print('<W(t=0)> =', np.absolute(np.mean(W0)))
-    W, temporal_evolution = integrateGinzburgLandauETD2(W0=W0, 
-                                                        Lp=Lp, 
-                                                        M=M, 
-                                                        dt=dt, 
-                                                        Tf=T, 
-                                                        params=params)
+    W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed) # "swarm" for swarm movie
+    print('< W(t=0) > =', np.absolute(np.mean(W0)))
+    W, temporal_evolution, temporal_slices = integrateGinzburgLandauETD2(W0=W0, 
+                                                                         Lp=Lp, 
+                                                                         M=M, 
+                                                                         dt=dt, 
+                                                                         Tf=T, 
+                                                                         params=params,
+                                                                         T_min_store=2000.0)
 
-    plotGinzburgLandau(W)
+    plotGinzburgLandau(W, temporal_evolution, temporal_slices)
     if directory is not None:
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
             np.save(directory + 'Ginzburg_Landau_ETD2_T='+str(t)+'.npy', temporal_evolution[n][1])
+    
+    return W, temporal_evolution, temporal_slicesi
 
-def plotGinzburgLandau(W):
+def plotGinzburgLandau(W, temporal_evolution, temporal_slices):
     x = np.arange(W.shape[0])
     X2, Y2 = np.meshgrid(x, x)
 
+    # Make snapshot of |W| in xy-plane
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.pcolor(X2, Y2, np.absolute(W))
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title('Type I Chimera')
+
+    # Plot time-evolution in ty-plane
+    N_timepoints = temporal_slices.shape[0]
+    t = np.linspace(2000.0, 2500, N_timepoints)
+    y = np.arange(W.shape[1])
+    T2, Y2 = np.meshgrid(t, y)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.pcolor(T2, Y2, np.absolute(temporal_slices).T)
+    ax.set_xlabel(r'$t$')
+    ax.set_ylabel(r'$y$')
+    ax.set_title('Time-Evolution of Type I Chimera')
+
+    # Show all oscillators at T = 2500 seconds
+    re_min, im_min = -1.5, -1.5
+    re_max, im_max =  1.5,  1.5
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    W_lin = W.flatten()
+    for index in range(len(W_lin)):
+        c = plt.Circle((np.real(W_lin[index]), np.imag(W_lin[index])), 0.01)
+        ax.add_patch(c)
+    ax.set_xlim(re_min, re_max)
+    ax.set_ylim(im_min, im_max)
     plt.show()
 
 def storeImages(directory=None):
-    
     # Load Data
     data = []
     if directory is None:
@@ -302,7 +336,6 @@ def makeHistogramMovie(directory=None):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.plot_surface(X2, Y2, H.T, rstride=5, cstride=5, color='orangered', edgecolors='k', lw=0.6)
-        #ax.plot_surface(X2, Y2, H.T, alpha=0.5, shade=True, color='gray')
         ax.set_xlabel(r'$|W|$')
         ax.set_ylabel(r'$\angle W$')
         ax.set_title(r'$T = $'+str(element[0]))
@@ -337,11 +370,14 @@ if __name__ == '__main__':
                             \tvideo: Make a (x,y,t) video based on the simulation data,\n
                             \thist: Make emergent-space video.
                             """)
+        parser.add_argument('--directory', type=str, nargs='?', dest='directory', default=None, help="""
+                            Name of directory to store simulation results, figures and movies. Default is not storing.
+                            """)
         return parser.parse_args()
 
     args = parseArguments()
     if args.run_type == 'pde':
-        runGinzburgLandau()
+        runGinzburgLandau(directory=args.directory)
     elif args.run_type == 'video':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
         storeImages(directory=directory)
