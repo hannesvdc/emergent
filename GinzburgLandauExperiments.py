@@ -8,13 +8,13 @@ import GinzburgLandau as gl
 def makeFigure1():
     # Run all experiments
     params_1 = {'c1': 0.2, 'c2': 0.56, 'eta': 1.5, 'eta': 0.9}
-    W_1, temporal_evolution_1, temporal_slices_1 = gl.runGinzburgLandau(params=params_1, directory=None)
+    W_1, _, temporal_slices_1 = gl.runGinzburgLandau(params=params_1, directory=None)
 
     params_2 = {'c1': 0.2, 'c2': 0.58, 'eta': 1.5, 'eta': 0.9}
-    W_2, temporal_evolution_2, temporal_slices_2 = gl.runGinzburgLandau(params=params_2, directory=None)
+    W_2, _, temporal_slices_2 = gl.runGinzburgLandau(params=params_2, directory=None)
 
     params_3 = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
-    W_3, temporal_evolution_3, temporal_slices_3 = gl.runGinzburgLandau(params=params_3, directory=None)
+    W_3, _, temporal_slices_3 = gl.runGinzburgLandau(params=params_3, directory=None)
 
     # Do precomputations for plotting
     x, y = np.arange(W_1.shape[0]), np.arange(W_1.shape[1])
@@ -31,6 +31,19 @@ def makeFigure1():
     axs[0,2].set_xlabel(r'$x$')
     axs[0,2].set_ylabel(r'$y$')
 
+    N_timepoints = temporal_slices_1.shape[0]
+    t = np.linspace(2000.0, 2500, N_timepoints)
+    y = np.arange(W.shape[1])
+    T2, Y2 = np.meshgrid(t, y)
+    axs[1,0].pcolor(T2, Y2, np.absolute(temporal_slices_1).T)
+    axs[1,0].set_xlabel(r'$t$')
+    axs[1,0].set_ylabel(r'$y$')
+    axs[1,1].pcolor(T2, Y2, np.absolute(temporal_slices_2).T)
+    axs[1,1].set_xlabel(r'$t$')
+    axs[1,1].set_ylabel(r'$y$')
+    axs[1,2].pcolor(T2, Y2, np.absolute(temporal_slices_3).T)
+    axs[1,2].set_xlabel(r'$t$')
+    axs[1,2].set_ylabel(r'$y$')
 
     re_min, im_min = -1.5, -1.5
     re_max, im_max =  1.5,  1.5

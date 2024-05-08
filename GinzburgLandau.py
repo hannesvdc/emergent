@@ -57,7 +57,6 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
 
 def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
     assert M % 2 == 0
-    print('Number of Mb', (Tf-T_min_store)/dt*512*8 / 10**6)
 
     c1 = params['c1']
     c2 = params['c2']
@@ -89,7 +88,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
             temporal_evolution.append((n*dt, W))
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)), np.min(np.angle(W)+np.pi), np.max(np.angle(W)+np.pi))
         if n * dt >= T_min_store:
-            temporal_slices[slice_counter,:] = W[100,:]
+            temporal_slices[slice_counter,:] = W[:,100]
             slice_counter += 1
 
         # Calculation of nonlinear part in Fourier space
@@ -106,7 +105,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
         nlAp = nlA
 
     temporal_evolution.append((Tf, W))
-    temporal_slices[-1,:] = W[100,:]
+    temporal_slices[-1,:] = W[:,100]
     return W, temporal_evolution, temporal_slices
 
 
@@ -131,15 +130,15 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          params=params,
                                                                          T_min_store=2000.0)
 
-    plotGinzburgLandau(W, temporal_evolution, temporal_slices)
+    plotGinzburgLandau(W, temporal_slices)
     if directory is not None:
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
             np.save(directory + 'Ginzburg_Landau_ETD2_T='+str(t)+'.npy', temporal_evolution[n][1])
     
-    return W, temporal_evolution, temporal_slicesi
+    return W, temporal_evolution, temporal_slices
 
-def plotGinzburgLandau(W, temporal_evolution, temporal_slices):
+def plotGinzburgLandau(W, temporal_slices):
     x = np.arange(W.shape[0])
     X2, Y2 = np.meshgrid(x, x)
 
@@ -170,7 +169,7 @@ def plotGinzburgLandau(W, temporal_evolution, temporal_slices):
     ax = fig.add_subplot(111)
     W_lin = W.flatten()
     for index in range(len(W_lin)):
-        c = plt.Circle((np.real(W_lin[index]), np.imag(W_lin[index])), 0.01)
+        c = plt.Circle((np.real(W_lin[index]), np.imag(W_lin[index])), 0.01, color='red')
         ax.add_patch(c)
     ax.set_xlim(re_min, re_max)
     ax.set_ylim(im_min, im_max)
