@@ -112,7 +112,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
 """ I assume a [0,1] x [0,1] grid with 256 grid points in each direction
     with positive (real and imaginary) random initial conditions (can be changed later)
 """
-def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, directory=None):
+def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, directory=None, plot=True):
     dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
@@ -130,7 +130,8 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          params=params,
                                                                          T_min_store=2000.0)
 
-    plotGinzburgLandau(W, temporal_slices)
+    if plot:
+        plotGinzburgLandau(W, temporal_slices)
     if directory is not None:
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
@@ -168,6 +169,8 @@ def plotGinzburgLandau(W, temporal_slices):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     W_lin = W.flatten()
+    centre = plt.Circle((0.0, 0.0), 1.0, color='blue', linestyle='dashed', fill = False)
+    ax.add_patch(centre)
     for index in range(len(W_lin)):
         c = plt.Circle((np.real(W_lin[index]), np.imag(W_lin[index])), 0.01, color='red')
         ax.add_patch(c)
