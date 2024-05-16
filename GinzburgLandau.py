@@ -117,7 +117,7 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
     T = 2500.0   # Need large enough timeframe for chimeras to form
-    seed = 100
+    seed = 100   # Can be changed, but gives nice pictures!
 
     Lp = 2.0*L
     W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed) # "swarm" for swarm movie
@@ -247,67 +247,6 @@ def makeMovie(image_folder=None):
     cv2.destroyAllWindows()
     video.release()
 
-def make3DMovie():
-    data = []
-    data_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New/'
-    store_directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
-    min_mod = 2.0
-    max_mod = 0.0
-    for filename in os.scandir(data_directory):
-        if not filename.is_file() or not filename.name.endswith('.npy'):
-            continue
-        T = parseT(filename.name)
-        W = np.load(data_directory + filename.name)
-        data.append((T, np.absolute(W)))
-        min_mod = min(min_mod, np.min(np.absolute(W)))
-        max_mod = max(max_mod, np.max(np.absolute(W)))
-    data.sort()
-    print('min / max modulus',  min_mod, max_mod)
-
-    M = 512
-    grid = np.linspace(0.0, 1.0, M)
-    X, Y = np.meshgrid(grid, grid)
-
-    cmap = cm.viridis
-    norm = matplotlib.colors.Normalize(vmin=min_mod, vmax=max_mod)
-    for element in data:
-        t = element[0]
-        W = element[1]
-        print('Make Plot at Time =', t)
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        colors = cmap(norm(W))
-        ax.plot_surface(X, Y, np.zeros_like(X), facecolors=colors)
-        ax.plot_surface(X, Y, W, alpha=0.3, shade=False)
-        ax.set_xlabel(r'$x$')
-        ax.set_ylabel(r'$y$')
-        ax.set_zlabel(r'$|W(x,y)|$')
-        ax.set_title(r'$T = $'+str(t))
-        ax.set_zlim((min_mod, max_mod))
-        plt.savefig(store_directory + 'GL_Modulus_T=' + dot_to_bar(str(round(t,4))) + '.png')
-        plt.close()
-       
-    images = []
-    for img in os.listdir(store_directory):
-        if not img.endswith('.png') or not img.startswith('GL_Modulus'):
-            continue
-        T = parseT(bar_to_dot(img), ext='.png')
-        images.append((T, img))
-    images.sort()
-        
-    frame = cv2.imread(os.path.join(store_directory, images[0][1]))
-    height, width, _ = frame.shape
-    video_name = 'Ginzburg_Landau_Modulus.avi'
-    fps = 10
-    video = cv2.VideoWriter(store_directory + video_name, 0, fps, (width,height))
-
-    for image in images:
-        video.write(cv2.imread(os.path.join(store_directory, image[1])))
-
-    cv2.destroyAllWindows()
-    video.release()
-
 def makeHistogramMovie(directory=None):
     data = []
     if directory is None:
@@ -391,8 +330,6 @@ if __name__ == '__main__':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
         storeImages(directory=directory)
         makeMovie(image_folder=directory)
-    elif args.run_type == '3d':
-        make3DMovie()
     elif args.run_type == 'hist':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
         makeHistogramMovie(directory=directory)
