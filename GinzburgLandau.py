@@ -133,9 +133,16 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     if plot:
         plotGinzburgLandau(W, temporal_slices)
     if directory is not None:
+        parameters_in_filename = lambda temp: '_c1=' + str(params['c1']) \
+                                            + '_c2=' + str(params['c2']) \
+                                            + '_nu=' + str(params['nu']) \
+                                            + '_eta='+ str(params['eta']) \
+                                            + '_T=' + str(temp)+'.npy'
+        np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
+        np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
-            np.save(directory + 'Ginzburg_Landau_ETD2_T='+str(t)+'.npy', temporal_evolution[n][1])
+            np.save(directory + 'Ginzburg_Landau_ETD2_Evolution' + parameters_in_filename(t), temporal_evolution[n][1])
     
     return W, temporal_evolution, temporal_slices
 

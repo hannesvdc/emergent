@@ -1,23 +1,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 
 import GinzburgLandau as gl
 
 # Code to recreate Figure 1 from [https://arxiv.org/pdf/1503.04053.pdf]
 def makeFigure1():
+    directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Simulation/'
+
     # Run all experiments
     print('Running Ginzburg-Landau with parameters 1.')
     params_1 = {'c1': 0.2, 'c2': 0.56, 'nu': 1.5, 'eta': 0.9}
-    W_1, _, temporal_slices_1 = gl.runGinzburgLandau(params=params_1, directory=None, plot=False)
+    W_1, _, temporal_slices_1 = gl.runGinzburgLandau(params=params_1, directory=directory, plot=False)
 
     print('Running Ginzburg-Landau with parameters 2.')
     params_2 = {'c1': 0.2, 'c2': 0.58, 'nu': 1.5, 'eta': 0.9}
-    W_2, _, temporal_slices_2 = gl.runGinzburgLandau(params=params_2, directory=None, plot=False)
+    W_2, _, temporal_slices_2 = gl.runGinzburgLandau(params=params_2, directory=directory, plot=False)
 
     print('Running Ginzburg-Landau with parameters 3.')
     params_3 = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
-    W_3, _, temporal_slices_3 = gl.runGinzburgLandau(params=params_3, directory=None, plot=False)
+    W_3, _, temporal_slices_3 = gl.runGinzburgLandau(params=params_3, directory=directory, plot=False)
 
     # Do precomputations for plotting
     x, y = np.arange(W_1.shape[0]), np.arange(W_1.shape[1])
@@ -74,5 +75,3 @@ def makeFigure1():
     plt.show()
 
 makeFigure1()
-
-
