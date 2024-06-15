@@ -118,7 +118,7 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
-    T = 10000.0  # Need large enough timeframe for chimeras to form
+    T = 5000.0   # Need large enough timeframe for chimeras to form
     seed = int(time.time())  # Can be changed, but gives nice pictures! (100 standard)
     print('seed =', seed)
 
@@ -131,7 +131,7 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          dt=dt, 
                                                                          Tf=T, 
                                                                          params=params,
-                                                                         T_min_store=9500.,
+                                                                         T_min_store=T-500.,
                                                                          store_slice=False)
 
     if directory is not None:

@@ -145,12 +145,13 @@ def make3DPlots(data_directory, video_directory):
         ax = fig.add_subplot(projection='3d')
         _ = ax.plot_surface(X2, Y2, Z2, rstride=1, cstride=1, facecolors = cm.jet((phi - min_A)/(max_A - min_A)),
                        linewidth=0, antialiased=False)
-        _ = ax.plot_surface(X2, Y2, y, rstride=35, cstride=35, color='dodgerblue', linewidth=0, antialiased=False, alpha=0.4)
+        _ = ax.plot_surface(X2, Y2, y, rstride=5, cstride=5, color='dodgerblue', linewidth=0, alpha=0.7)
         ax.set_xlabel(r'$x$')
         ax.set_ylabel(r'$y$')
         ax.set_zlabel(r'$W(x, y)$')
         ax.set_xlim((0.0, 1.0))
         ax.set_ylim((0.0, 1.0))
+        ax.grid(False)
         ax.set_zlim(0.025, max_A + 0.1)
         ax.set_title(r'$T = $'+str(t))
         plt.savefig(video_directory + '3d_proj_T=' + str(t) + '.png')
@@ -245,10 +246,11 @@ def makeHistogramMovie(directory=None):
 if __name__ == '__main__':
     def parseArguments():
         parser = argparse.ArgumentParser(description='Input for the Ginzburg-Landau PDE Solver.')
-        parser.add_argument('--type', type=str, nargs='?', dest='run_type', help="""Which type of experiment to run.\n
-                            \tpde: Run the 2-dimensional Ginzburg-Landau PDE,\n
-                            \tvideo: Make a (x,y,t) video based on the simulation data,\n
-                            \thist: Make emergent-space video.
+        parser.add_argument('--type', type=str, nargs='?', dest='run_type', help="""Which type of visualisation to make.\n
+                            \t3d_video: Make a (x,y,|W|) video based on the simulation data,\n
+                            \t2d_video: Make a (x,y,t) video based on the simulation data,\n
+                            \thistogram_video: Make emergent-space video,\n
+                            \tswarm_video: Maka an evolving swarm video. Currently not yet implemented.\n
                             """)
         parser.add_argument('--directory', type=str, nargs='?', dest='directory', default=None, help="""
                             Name of directory to store simulation results, figures and movies. Default is not storing.
@@ -260,7 +262,7 @@ if __name__ == '__main__':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Circular/'
         make3DPlots(directory, directory)
         make3DMovie(directory)
-    elif args.run_type == 'video':
+    elif args.run_type == '2d_video':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
         make2DPlots(directory=directory)
         make2DMovie(image_folder=directory)
