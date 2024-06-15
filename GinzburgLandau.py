@@ -2,6 +2,7 @@ import os
 import cv2
 import argparse
 import warnings
+import time
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -55,7 +56,7 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
         A = sc.ndimage.filters.gaussian_filter(A, sigma, mode='constant')
     return A
 
-def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
+def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0, store_slice=False):
     assert M % 2 == 0
 
     c1 = params['c1']
@@ -81,13 +82,15 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
     W = np.copy(W0)
     A = fft.fft2(W)
     temporal_evolution = list()
-    temporal_slices = np.zeros((int((Tf - T_min_store)/dt), W.shape[1]), dtype=complex); print(temporal_slices.size)
+    temporal_slices = np.zeros((int(1 if not store_slice else (Tf - T_min_store)/dt), W.shape[1]), dtype=complex); print(temporal_slices.size)
     slice_counter = 0
     for n in range(N):
         if n % 100 == 0:
-            temporal_evolution.append((n*dt, W))
             print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)), np.min(np.angle(W)+np.pi), np.max(np.angle(W)+np.pi))
-        if n * dt >= T_min_store:
+            if n * dt >= T_min_store:
+                temporal_evolution.append((n*dt, W))
+            
+        if store_slice and n * dt >= T_min_store:
             temporal_slices[slice_counter,:] = W[:,100]
             slice_counter += 1
 
@@ -105,7 +108,6 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0):
         nlAp = nlA
 
     temporal_evolution.append((Tf, W))
-    temporal_slices[-1,:] = W[:,100]
     return W, temporal_evolution, temporal_slices
 
 
@@ -116,8 +118,9 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
-    T = 2500.0   # Need large enough timeframe for chimeras to form
-    seed = 100   # Can be changed, but gives nice pictures!
+    T = 10000.0  # Need large enough timeframe for chimeras to form
+    seed = int(time.time())  # Can be changed, but gives nice pictures! (100 standard)
+    print('seed =', seed)
 
     Lp = 2.0*L
     W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed) # "swarm" for swarm movie
@@ -128,21 +131,23 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          dt=dt, 
                                                                          Tf=T, 
                                                                          params=params,
-                                                                         T_min_store=2000.0)
+                                                                         T_min_store=9500.,
+                                                                         store_slice=False)
 
-    if plot:
-        plotGinzburgLandau(W, temporal_slices)
     if directory is not None:
+        print('Stoing results in', directory)
         parameters_in_filename = lambda temp: '_c1=' + str(params['c1']) \
                                             + '_c2=' + str(params['c2']) \
                                             + '_nu=' + str(params['nu']) \
                                             + '_eta='+ str(params['eta']) \
                                             + '_T=' + str(temp)+'.npy'
-        np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
-        np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
+        #np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
+        #np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
             np.save(directory + 'Ginzburg_Landau_ETD2_Evolution' + parameters_in_filename(t), temporal_evolution[n][1])
+    if plot:
+        plotGinzburgLandau(W, temporal_slices)
     
     return W, temporal_evolution, temporal_slices
 
@@ -185,169 +190,13 @@ def plotGinzburgLandau(W, temporal_slices):
     ax.set_ylim(im_min, im_max)
     plt.show()
 
-def storeImages(directory=None):
-    # Load Data
-    data = []
-    if directory is None:
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
-    min_mod = 2.0
-    max_mod = 0.0
-    for filename in os.scandir(directory):
-        if not filename.is_file() or not filename.name.endswith('.npy'):
-            continue
-        T = parseT(filename.name)
-        if T < 10.0:
-            continue
-        W = np.load(directory + filename.name)
-        data.append((T,W))
-        min_mod = min(min_mod, np.min(np.absolute(W)))
-        max_mod = max(max_mod, np.max(np.absolute(W)))
-    data.sort()
-    print('min/max mod', min_mod, max_mod)
-
-    M = 512
-    grid = np.linspace(0.0, 1.0, M)
-    X2, Y2 = np.meshgrid(grid, grid)
-    for n in range(len(data)):
-        t = data[n][0]
-        W = data[n][1]
-        phi = np.absolute(W)
-        print('t =', t)
-
-        _ = plt.figure()
-        plt.pcolor(X2, Y2, phi, vmin=min_mod, vmax=max_mod)
-        plt.xlabel(r'$x$')
-        plt.ylabel(r'$y$')
-        plt.title(r'$T = $'+str(t))
-        plt.savefig(directory + 'GL_T='+dot_to_bar(str(round(t,4)))+'.png')
-        plt.close()
-
-def makeMovie(image_folder=None):
-    if image_folder is None:
-        image_folder = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
-    video_name = 'Ginzburg_Landau.avi'
-
-    images = []
-    for img in os.listdir(image_folder):
-        if not img.endswith('.png') or not img.startswith('GL'):
-            continue
-        T = parseT(bar_to_dot(img), ext='.png')
-        images.append((T, img))
-    images.sort()
-        
-    frame = cv2.imread(os.path.join(image_folder, images[0][1]))
-    height, width, _ = frame.shape
-
-    fps = 10
-    video = cv2.VideoWriter(image_folder + video_name, 0, fps, (width,height))
-
-    for image in images:
-        video.write(cv2.imread(os.path.join(image_folder, image[1])))
-
-    cv2.destroyAllWindows()
-    video.release()
-
-def makeHistogramMovie(directory=None):
-    data = []
-    if directory is None:
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
-    min_mod = 2.0
-    max_mod = 0.0
-    for filename in os.scandir(directory):
-        if not filename.is_file() or not filename.name.endswith('.npy'):
-            continue
-        T = parseT(filename.name)
-        W = np.load(directory + filename.name)
-        data.append((T, np.absolute(W).flatten(), np.angle(W).flatten() + np.pi))
-        min_mod = min(min_mod, np.min(np.absolute(W)))
-        max_mod = max(max_mod, np.max(np.absolute(W)))
-    print(min_mod, max_mod)
-    data.sort()
-
-    threshold = 1500
-    kernel_size = 30
-    kernel = np.ones((kernel_size, kernel_size)) / kernel_size**2
-    bins = [100, 100]
-    edges = [[min_mod, max_mod], [0.0, 2.0*np.pi]]
-    x_grid = np.linspace(min_mod, max_mod, bins[0])
-    y_grid = np.linspace(0.0, 2.0*np.pi, bins[1])
-    X2, Y2 = np.meshgrid(x_grid, y_grid)
-    for element in data:
-        print('T =', element[0], np.min(element[2]), np.max(element[2]), np.mean(element[2]))
-        H, x_edges, y_edges = np.histogram2d(x=element[1], y=element[2], bins=bins, range=edges)
-        print(np.min(H),np.max(H))
-        print(H.shape, kernel.shape)
-        H = sc.signal.convolve2d(H, kernel, mode='same', boundary='wrap')
-        H[np.where(H>threshold)] = threshold
-        H = H / np.sum(H)
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.plot_surface(X2, Y2, H.T, rstride=5, cstride=5, color='orangered', edgecolors='k', lw=0.6)
-        ax.set_xlabel(r'$|W|$')
-        ax.set_ylabel(r'$\angle W$')
-        ax.set_title(r'$T = $'+str(element[0]))
-        plt.savefig(directory + 'GL_Swarm_T=' + dot_to_bar(str(round(element[0],4))) + '.png')
-        plt.close()
-
-    images = []
-    for img in os.listdir(directory):
-        if not img.endswith('.png') or not img.startswith('GL_Swarm'):
-            continue
-        T = parseT(bar_to_dot(img), ext='.png')
-        images.append((T, img))
-    images.sort()
-        
-    frame = cv2.imread(os.path.join(directory, images[0][1]))
-    height, width, _ = frame.shape
-    video_name = 'Ginzburg_Landau_Swarm.avi'
-    fps = 10
-    video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
-
-    for image in images:
-        video.write(cv2.imread(os.path.join(directory, image[1])))
-
-    cv2.destroyAllWindows()
-    video.release()
-
 if __name__ == '__main__':
     def parseArguments():
         parser = argparse.ArgumentParser(description='Input for the Ginzburg-Landau PDE Solver.')
-        parser.add_argument('--type', type=str, nargs='?', dest='run_type', help="""Which type of experiment to run.\n
-                            \tpde: Run the 2-dimensional Ginzburg-Landau PDE,\n
-                            \tvideo: Make a (x,y,t) video based on the simulation data,\n
-                            \thist: Make emergent-space video.
-                            """)
         parser.add_argument('--directory', type=str, nargs='?', dest='directory', default=None, help="""
                             Name of directory to store simulation results, figures and movies. Default is not storing.
                             """)
         return parser.parse_args()
 
     args = parseArguments()
-    if args.run_type == 'pde':
-        runGinzburgLandau(directory=args.directory)
-    elif args.run_type == 'video':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
-        storeImages(directory=directory)
-        makeMovie(image_folder=directory)
-    elif args.run_type == 'hist':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
-        makeHistogramMovie(directory=directory)
-    elif args.run_type == 'pipeline':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_Swarm/'
-        try: # clear all existing files for new data.
-            files = os.listdir(directory)
-            for file in files:
-                file_path = os.path.join(directory, file)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-            print("All files deleted successfully.")
-        except OSError:
-            print("Error occurred while deleting files.")
-
-        runGinzburgLandau(directory=directory)
-        storeImages(directory=directory)
-        makeMovie(image_folder=directory)
-        makeHistogramMovie(directory=directory)
-    else:
-        print('Type of experiment not recognized. Returning.')
+    runGinzburgLandau(directory=args.directory)
