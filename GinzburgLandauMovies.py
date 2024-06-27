@@ -204,25 +204,35 @@ def makeHistogramMovie(directory):
     x_grid = np.linspace(min_mod, max_mod, bins[0])
     y_grid = np.linspace(min_angle, max_angle, bins[1])
     X2, Y2 = np.meshgrid(x_grid, y_grid)
+    real_x_grid = np.linspace(-0.5, 0.5, bins[0])
+    real_y_grid = np.linspace(-0.5, 0.5, bins[1])
     for index in range(len(data)):
         print('T = ', data[index][0])
         T = data[index][0]
         W = data[index][1]
         D = D_data[index][1]
 
+        # Buidl histogram and artificially increase frequency of non-DC components
         H, _, _ = np.histogram2d(np.absolute(W).flatten(), D.flatten(), bins=bins, range=edges)
         H = scipy.ndimage.gaussian_filter(H, axes=0, sigma=0.2, mode='wrap')
-        H[0:90, :] = 50.0 * H[0:90, :] # Scale for visualization, does not scale underlying data
+        H[0:90, :] = 100.0 * H[0:90, :] # Scale for visualization, does not scale underlying data
 
+        # Create facecolors for complex plotting
+        centred_x, centred_y = np.meshgrid(real_x_grid, real_y_grid)
+        phi = np.arctan2(centred_y, centred_x)
 
+        # Do the actual plotting
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(Y2, X2, np.zeros_like(X2) - 10000, facecolors = cm.hsv((phi + np.pi)/(2.0 * np.pi)))
         ax.plot_surface(Y2, X2, H.T, color='gray', alpha=0.6)
         ax.set_xlabel(r'$\angle \Delta W$')
         ax.set_ylabel(r'$|W|$')
         ax.set_zlabel(r'$g$')
         ax.set_title(r'$T = $'+str(T))
         ax.set_zlim(-10000, 25000)
+        ax.set_zticklabels([])
+        ax.grid(False)
         plt.savefig(directory + 'GL_Histogram_T=' + dot_to_bar(str(round(T,4))) + '.png')
         plt.close()
 
