@@ -1,5 +1,3 @@
-import os
-import cv2
 import argparse
 import warnings
 import time
@@ -7,10 +5,7 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 import numpy.fft as fft
-import scipy as sc
 import matplotlib.pyplot as plt
-from matplotlib import cm
-import matplotlib
 
 def parseT(filename, ext='.npy'):
     index = filename.find('T=')
@@ -50,10 +45,6 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
         A = (A * N**2 / np.sum(A)) * eta
     if ic == 'rand':
         A = np.random.randn(N,N) + 1j*np.random.randn(N,N) - 1j
-    if ic == 'swarm':
-        sigma = 0.1
-        A = np.random.randn(N,N) + 1j*np.random.randn(N,N) - 1j
-        A = sc.ndimage.filters.gaussian_filter(A, sigma, mode='constant')
     return A
 
 def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0, store_slice=False):
@@ -82,11 +73,11 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0, stor
     W = np.copy(W0)
     A = fft.fft2(W)
     temporal_evolution = list()
-    temporal_slices = np.zeros((int(1 if not store_slice else (Tf - T_min_store)/dt), W.shape[1]), dtype=complex); print(temporal_slices.size)
+    temporal_slices = np.zeros((int(1 if not store_slice else (Tf - T_min_store)/dt), W.shape[1]), dtype=complex)
     slice_counter = 0
     for n in range(N):
-        if n % 100 == 0:
-            print('T =', n*dt, np.min(np.absolute(W)), np.max(np.absolute(W)), np.min(np.angle(W)+np.pi), np.max(np.angle(W)+np.pi))
+        if n % 10 == 0:
+            print('T =', n*dt)
             if n * dt >= T_min_store:
                 temporal_evolution.append((n*dt, W))
             
@@ -118,13 +109,12 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
+    Lp = 2.0*L   # For some reason...
     T = 5000.0   # Need large enough timeframe for chimeras to form
     seed = int(time.time())  # Can be changed, but gives nice pictures! (100 standard)
     print('seed =', seed)
 
-    Lp = 2.0*L
     W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed) # "swarm" for swarm movie
-    print('< W(t=0) > =', np.absolute(np.mean(W0)))
     W, temporal_evolution, temporal_slices = integrateGinzburgLandauETD2(W0=W0, 
                                                                          Lp=Lp, 
                                                                          M=M, 
@@ -135,7 +125,7 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          store_slice=False)
 
     if directory is not None:
-        print('Stoing results in', directory)
+        print('Storing results in', directory)
         parameters_in_filename = lambda temp: '_c1=' + str(params['c1']) \
                                             + '_c2=' + str(params['c2']) \
                                             + '_nu=' + str(params['nu']) \

@@ -2,7 +2,6 @@ import os
 import cv2
 
 import numpy as np
-import scipy
 import scipy.ndimage.filters as filters
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -214,7 +213,7 @@ def makeHistogramMovie(directory):
 
         # Buidl histogram and artificially increase frequency of non-DC components
         H, _, _ = np.histogram2d(np.absolute(W).flatten(), D.flatten(), bins=bins, range=edges)
-        H = scipy.ndimage.gaussian_filter(H, axes=0, sigma=0.2, mode='wrap')
+        H = filters.gaussian_filter(H, axes=0, sigma=0.2, mode='wrap')
         H[0:90, :] = 100.0 * H[0:90, :] # Scale for visualization, does not scale underlying data
 
         # Create facecolors for complex plotting
@@ -247,7 +246,7 @@ def makeHistogramMovie(directory):
     frame = cv2.imread(os.path.join(directory, images[0][1]))
     height, width, _ = frame.shape
     video_name = 'Ginzburg_Landau_Histogram.avi'
-    fps = 5
+    fps = 2
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
@@ -266,16 +265,13 @@ def makeSwarmPlots(data_directory):
     assert data[0][1].shape[0] == M
     dx = 1.0 / M
     for (T, W) in data:
-        Wx = (np.roll(W, -1, axis=0) - np.roll(W, 1, axis=0)) / (2.0*dx)
-        Wy = (np.roll(W, -1, axis=1) - np.roll(W, 1, axis=1)) / (2.0*dx)
-        D = Wx + Wy
+        Wxx = (np.roll(W, -1, axis=0) - 2.0*W + np.roll(W, 1, axis=0))
+        Wyy = (np.roll(W, -1, axis=1) - 2.0*W + np.roll(W, 1, axis=1))
+        D = (Wxx + Wyy) / dx**2
 
         RD = np.real(D)
         ID = np.imag(D)
         print('T =', T, np.min(RD), np.max(RD), np.min(ID), np.max(ID))
-
-    
-
 
 if __name__ == '__main__':
     def parseArguments():
