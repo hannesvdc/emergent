@@ -23,7 +23,7 @@ def _parameters(filename):
     index2 = filename.find('_c2=')
     index3 = filename.find('_nu=')
     index4 = filename.find('_eta=')
-    index5 = filename.find('_T=')
+    index5 = filename.find('_seed=')
 
     c1 = float(filename[index+4:index2])
     c2 = float(filename[index2+4:index3])
@@ -59,22 +59,10 @@ def _load_data(data_directory, params, reduce=False):
 
 def make2DPlots(directory=None):
     # Load Data
-    data = []
-    if directory is None:
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
-    min_mod = 2.0
-    max_mod = 0.0
-    for filename in os.scandir(directory):
-        if not filename.is_file() or not filename.name.endswith('.npy'):
-            continue
-        T = _T(filename.name)
-        if T < 10.0:
-            continue
-        W = np.load(directory + filename.name)
-        data.append((T,W))
-        min_mod = min(min_mod, np.min(np.absolute(W)))
-        max_mod = max(max_mod, np.max(np.absolute(W)))
-    data.sort()
+    params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
+    M = 512
+
+    data, min_mod, max_mod = _load_data(directory, params, reduce=True)
     print('min/max mod', min_mod, max_mod)
 
     M = 512
@@ -170,7 +158,7 @@ def make3DMovie(directory):
     frame = cv2.imread(os.path.join(directory, images[0][1]))
     height, width, _ = frame.shape
 
-    fps = 5
+    fps = 20
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
@@ -246,7 +234,7 @@ def makeHistogramMovie(directory):
     frame = cv2.imread(os.path.join(directory, images[0][1]))
     height, width, _ = frame.shape
     video_name = 'Ginzburg_Landau_Histogram.avi'
-    fps = 2
+    fps = 20
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
@@ -289,7 +277,7 @@ if __name__ == '__main__':
     args = parseArguments()
     
     if args.run_type == '3d_video':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
+        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D_new/'
         make3DPlots(directory, directory)
         make3DMovie(directory)
     elif args.run_type == '2d_video':
@@ -297,7 +285,7 @@ if __name__ == '__main__':
         make2DPlots(directory=directory)
         make2DMovie(image_folder=directory)
     elif args.run_type == 'histogram_video':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
+        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D_new/'
         makeHistogramMovie(directory=directory)
     elif args.run_type == 'swarm_movie':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
