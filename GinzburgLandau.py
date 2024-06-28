@@ -19,7 +19,7 @@ def bar_to_dot(string):
     return string.replace('_', '.')
 
 def create_initial_conditions(ic, Lp, N, eta, seed=None):
-    """Specify initial conditions for zero-flux boundary conditions."""
+    """Specify initial conditions for periodic boundary conditions. """
     binsp = (Lp / N) * np.arange(-N / 2, N / 2)
     Xp, Yp = np.meshgrid(binsp, binsp)
     if seed is not None:
@@ -43,8 +43,6 @@ def create_initial_conditions(ic, Lp, N, eta, seed=None):
         A[:int(N / 4), :] = A[:int(N / 4), :] + 0.01 * \
             np.reshape(np.random.randn(int(N / 4 * N)), (int(N / 4), N))
         A = (A * N**2 / np.sum(A)) * eta
-    if ic == 'rand':
-        A = np.random.randn(N,N) + 1j*np.random.randn(N,N) - 1j
     return A
 
 def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0, store_slice=False):
@@ -111,10 +109,9 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
     L = 400.0    # from run_2d.py
     Lp = 2.0*L   # For some reason...
     T = 5000.0   # Need large enough timeframe for chimeras to form
-    seed = int(time.time())  # Can be changed, but gives nice pictures! (100 standard)
-    print('seed =', seed)
+    seed = 100   # Can be changed, but gives nice pictures! (100 standard)
 
-    W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed) # "swarm" for swarm movie
+    W0 = create_initial_conditions("plain_rand", Lp, M, params['eta'], seed=seed)
     W, temporal_evolution, temporal_slices = integrateGinzburgLandauETD2(W0=W0, 
                                                                          Lp=Lp, 
                                                                          M=M, 
@@ -126,10 +123,11 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
 
     if directory is not None:
         print('Storing results in', directory)
-        parameters_in_filename = lambda temp: '_c1=' + str(params['c1']) \
-                                            + '_c2=' + str(params['c2']) \
-                                            + '_nu=' + str(params['nu']) \
-                                            + '_eta='+ str(params['eta']) \
+        parameters_in_filename = lambda temp: '_c1='   + str(params['c1']) \
+                                            + '_c2='   + str(params['c2']) \
+                                            + '_nu='   + str(params['nu']) \
+                                            + '_eta='  + str(params['eta']) \
+                                            + '_seed=' + str(seed) \
                                             + '_T=' + str(temp)+'.npy'
         #np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
         #np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
@@ -137,11 +135,11 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
             t = temporal_evolution[n][0]
             np.save(directory + 'Ginzburg_Landau_ETD2_Evolution' + parameters_in_filename(t), temporal_evolution[n][1])
     if plot:
-        plotGinzburgLandau(W, temporal_slices)
+        plotGinzburgLandau(W, temporal_slices, seed)
     
     return W, temporal_evolution, temporal_slices
 
-def plotGinzburgLandau(W, temporal_slices):
+def plotGinzburgLandau(W, temporal_slices, seed=None):
     x = np.arange(W.shape[0])
     X2, Y2 = np.meshgrid(x, x)
 
@@ -151,7 +149,7 @@ def plotGinzburgLandau(W, temporal_slices):
     ax.pcolor(X2, Y2, np.absolute(W))
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
-    ax.set_title('Type I Chimera')
+    ax.set_title('Type I Chimera Seed = ' + str(seed))
 
     # Plot time-evolution in ty-plane
     N_timepoints = temporal_slices.shape[0]
