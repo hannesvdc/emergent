@@ -23,7 +23,10 @@ def _parameters(filename):
     index2 = filename.find('_c2=')
     index3 = filename.find('_nu=')
     index4 = filename.find('_eta=')
-    index5 = filename.find('_seed=')
+    if filename.find('_seed=') != -1:
+        index5 = filename.find('_seed=')
+    else:
+        index5 = filename.find('_T=')
 
     c1 = float(filename[index+4:index2])
     c2 = float(filename[index2+4:index3])
@@ -62,7 +65,7 @@ def make2DPlots(directory=None):
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
     M = 512
 
-    data, min_mod, max_mod = _load_data(directory, params, reduce=True)
+    data, min_mod, max_mod = _load_data(directory, params, reduce=False)
     print('min/max mod', min_mod, max_mod)
 
     M = 512
