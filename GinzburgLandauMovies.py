@@ -256,9 +256,12 @@ def makeSwarmPlots(data_directory):
     max_Re = -np.inf
     min_Im = np.inf
     max_Im = -np.inf
-    Re_D_data = np.zeros((M**2, len(data)))
-    Im_D_data = np.zeros((M**2, len(data)))
-    A_W_data = np.zeros((M**2, len(data)))
+
+    num_samples = 50000
+    idx = np.random.choice(np.arange(M**2), num_samples)
+    Re_D_data = np.zeros((num_samples, len(data)))
+    Im_D_data = np.zeros((num_samples, len(data)))
+    A_W_data = np.zeros((num_samples, len(data)))
 
     counter = 0
     for (T, W) in data:
@@ -270,9 +273,9 @@ def makeSwarmPlots(data_directory):
         RD = np.real(D)
         ID = np.imag(D)
         A = np.absolute(W)
-        Re_D_data[:,counter] = RD.flatten()
-        Im_D_data[:,counter] = ID.flatten()
-        A_W_data[:,counter] = A.flatten()
+        Re_D_data[:,counter] = RD.flatten()[idx]
+        Im_D_data[:,counter] = ID.flatten()[idx]
+        A_W_data[:,counter]  = A.flatten()[idx]
         counter += 1
 
         min_Re = min(min_Re, np.min(RD))
@@ -282,15 +285,13 @@ def makeSwarmPlots(data_directory):
     print(min_Re, max_Re, min_Im, max_Im)
 
     # Plotting
-    num_samples = 50000
-    idx = np.random.choice(np.arange(Re_D_data.shape[0]), num_samples)
     for n in range(len(data)):
         T = data[n][0]
         print('T =', T)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(Re_D_data[idx,n], Im_D_data[idx,n], A_W_data[idx,n], s=0.1)
+        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], A_W_data[:,n], s=0.1)
         ax.set_xlim((-10.**5, 10.**5))
         ax.set_ylim((-10.**5, 10.**5))
         ax.set_zlim3d((min_A, max_A))
