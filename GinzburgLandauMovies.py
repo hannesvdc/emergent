@@ -46,7 +46,7 @@ def _load_data(data_directory, params, reduce=False):
         if _parameters(filename.name) != params:
             continue
         T = _T(filename.name)
-        if reduce and int(T) % 5 != 0:
+        if reduce and not T.is_integer():
             continue
 
         print(filename.name)
@@ -86,8 +86,6 @@ def make2DPlots(directory=None):
         plt.close()
 
 def make2DMovie(image_folder=None):
-    if image_folder is None:
-        image_folder = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_New_Images/'
     video_name = 'Ginzburg_Landau.avi'
 
     images = []
@@ -143,8 +141,8 @@ def make3DPlots(data_directory, video_directory):
         ax.set_ylim((0.0, 1.0))
         ax.grid(False)
         ax.set_zlim(0.025, max_A + 0.1)
-        ax.set_title(r'$T = $'+str(t))
-        plt.savefig(video_directory + '3d_proj_T=' + str(t) + '.png')
+        ax.set_title(r'$T = $'+str(round(t,1)))
+        plt.savefig(video_directory + '3d_proj_T=' + str(round(t, 1)) + '.png')
         plt.close()
 
 def make3DMovie(directory):
@@ -161,7 +159,7 @@ def make3DMovie(directory):
     frame = cv2.imread(os.path.join(directory, images[0][1]))
     height, width, _ = frame.shape
 
-    fps = 20
+    fps = 10
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
@@ -249,20 +247,80 @@ def makeHistogramMovie(directory):
 def makeSwarmPlots(data_directory):
     # Load simulation data into memory
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
-    data, _, _ = _load_data(data_directory, params)
+    data, min_A, max_A = _load_data(data_directory, params)
 
     # Compute finite differences approximation of the gradient for all T
     M = 512
-    assert data[0][1].shape[0] == M
     dx = 1.0 / M
+    min_Re = np.inf
+    max_Re = -np.inf
+    min_Im = np.inf
+    max_Im = -np.inf
+    Re_D_data = np.zeros((M**2, len(data)))
+    Im_D_data = np.zeros((M**2, len(data)))
+    A_W_data = np.zeros((M**2, len(data)))
+
+    counter = 0
     for (T, W) in data:
+        print('T =', T)
         Wxx = (np.roll(W, -1, axis=0) - 2.0*W + np.roll(W, 1, axis=0))
         Wyy = (np.roll(W, -1, axis=1) - 2.0*W + np.roll(W, 1, axis=1))
         D = (Wxx + Wyy) / dx**2
 
         RD = np.real(D)
         ID = np.imag(D)
-        print('T =', T, np.min(RD), np.max(RD), np.min(ID), np.max(ID))
+        A = np.absolute(W)
+        Re_D_data[:,counter] = RD.flatten()
+        Im_D_data[:,counter] = ID.flatten()
+        A_W_data[:,counter] = A.flatten()
+        counter += 1
+
+        min_Re = min(min_Re, np.min(RD))
+        max_Re = max(max_Re, np.max(RD))
+        min_Im = min(min_Im, np.min(ID))
+        max_Im = max(max_Im, np.max(ID))
+    print(min_Re, max_Re, min_Im, max_Im)
+
+    # Plotting
+    num_samples = 50000
+    idx = np.random.choice(np.arange(Re_D_data.shape[0]), num_samples)
+    for n in range(len(data)):
+        T = data[n][0]
+        print('T =', T)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(Re_D_data[idx,n], Im_D_data[idx,n], A_W_data[idx,n], s=0.1)
+        ax.set_xlim((-10.**5, 10.**5))
+        ax.set_ylim((-10.**5, 10.**5))
+        ax.set_zlim3d((min_A, max_A))
+        ax.set_xlabel(r'Re $\Delta W$')
+        ax.set_ylabel(r'Im $\Delta W$')
+        ax.set_zlabel(r'$|W|$')
+        ax.set_title(r'$T = $' + str(round(T, 1)))
+        plt.savefig(directory + 'GL_Swarm_T=' + dot_to_bar(str(round(T,4))) + '.png')
+        plt.close()
+
+def makeSwarmMovie(directory):
+    images = []
+    for img in os.listdir(directory):
+        if not img.endswith('.png') or not img.startswith('GL_Swarm'):
+            continue
+        T = _T(bar_to_dot(img), ext='.png')
+        images.append((T, img))
+    images.sort()
+        
+    frame = cv2.imread(os.path.join(directory, images[0][1]))
+    height, width, _ = frame.shape
+    video_name = 'Ginzburg_Landau_Swarm.avi'
+    fps = 20
+    video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
+
+    for image in images:
+        video.write(cv2.imread(os.path.join(directory, image[1])))
+
+    cv2.destroyAllWindows()
+    video.release()
 
 if __name__ == '__main__':
     def parseArguments():
@@ -280,7 +338,7 @@ if __name__ == '__main__':
     args = parseArguments()
     
     if args.run_type == '3d_video':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D_new/'
+        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
         make3DPlots(directory, directory)
         make3DMovie(directory)
     elif args.run_type == '2d_video':
@@ -288,10 +346,11 @@ if __name__ == '__main__':
         make2DPlots(directory=directory)
         make2DMovie(image_folder=directory)
     elif args.run_type == 'histogram_video':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D_new/'
+        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeHistogramMovie(directory=directory)
     elif args.run_type == 'swarm_movie':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeSwarmPlots(directory)
+        makeSwarmMovie(directory)
     else:
         print('Type of experiment not recognized. Returning.')
