@@ -247,7 +247,7 @@ def makeHistogramMovie(directory):
 def makeSwarmPlots(data_directory):
     # Load simulation data into memory
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
-    data, min_A, max_A = _load_data(data_directory, params)
+    data, min_A, max_A = _load_data(data_directory, params, reduce=True)
 
     # Compute finite differences approximation of the gradient for all T
     M = 512
@@ -291,7 +291,13 @@ def makeSwarmPlots(data_directory):
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], A_W_data[:,n], s=0.1)
+        ax.xaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+        ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+        ax.zaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], A_W_data[:,n], s=0.1, cmap='viridis')
+        ax.scatter(Im_D_data[:,n], A_W_data[:,n], zdir='x', zs=-10.**5, color='gray', s=0.1)
+        ax.scatter(Re_D_data[:,n], A_W_data[:,n], zdir='y', zs=10.**5, color='gray', s=0.1)
+        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], zdir='z', zs=min_A, color='gray',s=0.1)
         ax.set_xlim((-10.**5, 10.**5))
         ax.set_ylim((-10.**5, 10.**5))
         ax.set_zlim3d((min_A, max_A))
