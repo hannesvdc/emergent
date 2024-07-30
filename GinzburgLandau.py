@@ -1,6 +1,5 @@
 import argparse
 import warnings
-import time
 warnings.filterwarnings("ignore")
 
 import numpy as np
