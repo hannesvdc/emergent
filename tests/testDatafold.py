@@ -19,6 +19,7 @@ idx_plot = np.random.permutation(nr_samples)[0:nr_samples_plot]
 
 # generate point cloud
 X, X_color = make_swiss_roll(nr_samples, random_state=3, noise=0)
+print(X.shape)
 
 # plot
 fig = plt.figure(figsize=(10, 10))
