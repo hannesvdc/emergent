@@ -1,5 +1,5 @@
 import numpy as np
-import numpy.linalg as lg
+import scipy.linalg as slg
 import matplotlib.pyplot as plt
 
 def createGLDataset():
@@ -40,23 +40,30 @@ def computeDiffusionMap(eps):
     chunk_directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/dmaps/'
     filename = 'timechunks.npy'
     X = np.load(chunk_directory + filename)
-    M = 25000
+    M = 5000
     X = X[:, np.random.permutation(X.shape[1])] [:, 0:M] # subsample for speed and memory usage
 
     print('Constructing kernel matrix')
-    kernel = lambda x, Y: np.exp(-np.sum(np.abs(x[:,np.newaxis] - Y)**2, axis=0) / eps)
+    kernel = lambda x: np.exp(-np.sum(np.abs(x[:,np.newaxis] - X)**2, axis=0) / eps)
     K = np.zeros((X.shape[1], X.shape[1]))
     for n in range(X.shape[1]):
-        K[n, :] = kernel(X[:,n], X)
-    K = K / np.sum(K, axis=1, keepdims=True)
+        K[n, :] = kernel(X[:,n])
+    P = K / np.sum(K, axis=1, keepdims=True)
 
     # Compute eigenvalues to see a cut-off
     print('Computing Eigenvalues')
-    eigvals = np.abs(np.flip(lg.eigvalsh(K)))
-    print(eigvals)
-    plt.plot(np.arange(len(eigvals)), eigvals)
+    eigvals, eigvecs = slg.eig(P, left=True, right=False)
+    for n in range(20):
+        print(n+1, np.vdot(eigvecs[:,0], eigvecs[:,n+1]))
+    plt.plot(np.arange(len(eigvals)), np.real(eigvals), marker='o', label='Left Eigenvalues in Descending Order')
+    plt.legend()
+    plt.figure()
+    plt.scatter(eigvecs[:,0]/slg.norm(eigvecs[:,0]), eigvecs[:,10]/slg.norm(eigvecs[:,10]))
+    plt.xlabel(r'$\psi_0$')
+    plt.ylabel(r'$\psi_3$', rotation=0)
     plt.show()
 
+
 if __name__ == '__main__':
-    eps = 1.0
+    eps = 10.0
     computeDiffusionMap(eps)
