@@ -20,6 +20,7 @@ idx_plot = np.random.permutation(nr_samples)[0:nr_samples_plot]
 # generate point cloud
 X, X_color = make_swiss_roll(nr_samples, random_state=3, noise=0)
 print(X.shape)
+print(type(X))
 
 # plot
 fig = plt.figure(figsize=(10, 10))
@@ -40,6 +41,7 @@ plt.close()
 
 # Optimize kernel parameters
 X_pcm = pfold.PCManifold(X)
+print(type(X_pcm))
 X_pcm.optimize_parameters(n_subsample =5000,tol =1e-08,k= 100)
 print(f"epsilon={X_pcm.kernel.epsilon}, cut-off={X_pcm.cut_off}")
 
