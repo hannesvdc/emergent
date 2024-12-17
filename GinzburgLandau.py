@@ -102,7 +102,7 @@ def integrateGinzburgLandauETD2(W0, Lp, M, dt, Tf, params, T_min_store=0.0, stor
 """ I assume a [0,1] x [0,1] grid with 256 grid points in each direction
     with positive (real and imaginary) random initial conditions (can be changed later)
 """
-def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, directory=None, plot=True):
+def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, directory=None, plot=True, time_slice=False):
     dt = 0.01    # See [https://arxiv.org/8pdf/1503.04053.pdf, Figure 1(c)]
     M = 512      # from run_2d.py
     L = 400.0    # from run_2d.py
@@ -118,7 +118,7 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                                                          Tf=T, 
                                                                          params=params,
                                                                          T_min_store=T-500.,
-                                                                         store_slice=False)
+                                                                         store_slice=time_slice)
 
     if directory is not None:
         print('Storing results in', directory)
@@ -128,8 +128,9 @@ def runGinzburgLandau(params={'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}, dir
                                             + '_eta='  + str(params['eta']) \
                                             + '_seed=' + str(seed) \
                                             + '_T=' + str(temp)+'.npy'
-        #np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
-        #np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
+        if time_slice:
+            np.save(directory + 'Ginzburg_Landau_ETD2_SS' + parameters_in_filename(T), W)
+            np.save(directory + 'Ginzburg_Landau_ETD2_Slice' + parameters_in_filename(T), temporal_slices)
         for n in range(len(temporal_evolution)):
             t = temporal_evolution[n][0]
             np.save(directory + 'Ginzburg_Landau_ETD2_Evolution' + parameters_in_filename(t), temporal_evolution[n][1])
@@ -178,11 +179,21 @@ def plotGinzburgLandau(W, temporal_slices, seed=None):
     plt.show()
 
 if __name__ == '__main__':
+    def str2bool(value):
+        if isinstance(value, bool):
+            return value
+        if value.lower() in {'true', '1', 'yes', 'y'}:
+            return True
+        elif value.lower() in {'false', '0', 'no', 'n'}:
+            return False
+        else:
+            raise argparse.ArgumentTypeError("Boolean value expected.")
     def parseArguments():
         parser = argparse.ArgumentParser(description='Input for the Ginzburg-Landau PDE Solver.')
         parser.add_argument('--directory', type=str, nargs='?', dest='directory', default=None, help="""
                             Name of directory to store simulation results, figures and movies. Default is not storing.
                             """)
+        parser.add_argument('--time_slice', type=str2bool, nargs='?', default=False)
         return parser.parse_args()
 
     args = parseArguments()
