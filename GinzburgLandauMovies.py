@@ -338,6 +338,8 @@ def makeJoined3DHistogramMovie(directory):
         if not img.endswith('.png') or not img.startswith('joined_'):
             continue
         T = _T(bar_to_dot(img), ext='.png')
+        if T > 4600.0:
+            continue
         images.append((T, img))
     images.sort()
         
@@ -348,8 +350,6 @@ def makeJoined3DHistogramMovie(directory):
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
-        if T > 4600.0:
-            break
         video.write(cv2.imread(os.path.join(directory, image[1])))
 
     cv2.destroyAllWindows()
@@ -409,7 +409,6 @@ def makeSwarmPlots(data_directory):
         ax.scatter(Im_D_data[:,n], A_W_data[:,n], zdir='x', zs=-10.**5 + 1.0, color='gray')
         ax.scatter(Re_D_data[:,n], A_W_data[:,n], zdir='y', zs=10.**5 - 1.0, color='gray')
         ax.scatter(Re_D_data[:,n], Im_D_data[:,n], zdir='z', zs=min_A + 0.01, color='gray')
-        #ax.plot(x, y, zs=0, zdir='z', label='curve in (x, y)')
         ax.set_xlim((-10.**5, 10.**5))
         ax.set_ylim((-10.**5, 10.**5))
         ax.set_zlim3d((min_A, max_A))
@@ -426,6 +425,8 @@ def makeSwarmMovie(directory):
         if not img.endswith('.png') or not img.startswith('GL_Swarm'):
             continue
         T = _T(bar_to_dot(img), ext='.png')
+        if T > 4600.0:
+            continue
         images.append((T, img))
     images.sort()
         
@@ -436,8 +437,6 @@ def makeSwarmMovie(directory):
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
-        if T > 4600.0:
-            break
         video.write(cv2.imread(os.path.join(directory, image[1])))
 
     cv2.destroyAllWindows()
@@ -472,9 +471,6 @@ if __name__ == '__main__':
     elif args.run_type == 'swarm_movie':
         directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeSwarmPlots(directory)
-        makeSwarmMovie(directory)
-    elif args.run_type == 'swarm_movie_alone': #TODO: Remove Later
-        directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeSwarmMovie(directory)
     elif args.run_type == 'joined_3d_histogram':
         directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
