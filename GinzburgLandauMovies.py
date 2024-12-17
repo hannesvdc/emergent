@@ -38,6 +38,7 @@ def _load_data(data_directory, params, reduce=False):
     min_A = np.inf
     max_A = 0
     data = []
+    counter = 1
     for filename in os.scandir(data_directory):
         if not filename.is_file() \
            or not filename.name.startswith('Ginzburg_Landau_ETD2_Evolution') \
@@ -49,13 +50,15 @@ def _load_data(data_directory, params, reduce=False):
         if reduce and not T.is_integer():
             continue
 
-        print(filename.name)
+        print('Read File:', counter, '/', 5001)
+        counter += 1
 
         W = np.load(data_directory + filename.name)
         data.append((T,W))
 
         min_A = min(min_A, np.min(np.absolute(W)))
         max_A = max(max_A, np.max(np.absolute(W)))
+
     data.sort()
     
     return data, min_A, max_A
@@ -244,10 +247,118 @@ def makeHistogramMovie(directory):
     cv2.destroyAllWindows()
     video.release()
 
+def makeJoined3DHistogramPlots(directory):
+    params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
+    M = 512
+    dx = 1.0 / M
+
+    # 3D plot
+    data, min_A, max_A = _load_data(directory, params)
+    print('min/max mod', min_A, max_A)
+    D_data = list()
+    min_angle, max_angle = -np.pi, np.pi
+    for (T, W) in data:
+        Wxx = (np.roll(W, -1, axis=0) - 2.0*W + np.roll(W, 1, axis=0))
+        Wyy = (np.roll(W, -1, axis=1) - 2.0*W + np.roll(W, 1, axis=1))
+        D = (Wxx + Wyy) / dx**2
+
+        D_angle = np.angle(D)
+        min_angle = min(min_angle, np.min(D_angle))
+        max_angle = max(max_angle, np.max(D_angle))
+        D_data.append((T, D_angle))
+
+    bins = [100, 100]
+    edges = [[min_A, max_A], [min_angle, max_angle]]
+    x_grid = np.linspace(min_A, max_A, bins[0])
+    y_grid = np.linspace(min_angle, max_angle, bins[1])
+    X2, Y2 = np.meshgrid(x_grid, y_grid)
+    real_x_grid = np.linspace(-0.5, 0.5, bins[0])
+    real_y_grid = np.linspace(-0.5, 0.5, bins[1])
+
+    # Do actual plotting
+    x_grid_3d = np.linspace(0.0, 1.0, M)
+    y_grid_3d = np.linspace(0.0, 1.0, M)
+    X2_3d, Y2_3d = np.meshgrid(x_grid_3d, y_grid_3d)
+    Z2_3d = np.zeros_like(X2_3d)
+    for n in range(len(data)):
+        t_3d = data[n][0]
+        W_3d = data[n][1]
+        phi_3d = np.absolute(W_3d)
+        sigma_x = sigma_y = 5
+        sigma = [sigma_y, sigma_x]
+        y = filters.gaussian_filter(phi_3d, sigma, mode='wrap')
+        print('t =', t_3d)
+
+        T = data[n][0]
+        W = data[n][1]
+        D = D_data[n][1]
+
+        # Buidl histogram and artificially increase frequency of non-DC components
+        H, _, _ = np.histogram2d(np.absolute(W).flatten(), D.flatten(), bins=bins, range=edges)
+        H = filters.gaussian_filter(H, axes=0, sigma=0.2, mode='wrap')
+        H[0:90, :] = 100.0 * H[0:90, :] # Scale for visualization, does not scale underlying data
+
+        # Create facecolors for complex plotting
+        centred_x, centred_y = np.meshgrid(real_x_grid, real_y_grid)
+        psi = np.arctan2(centred_y, centred_x)
+
+        fig = plt.figure(facecolor='white')
+        ax1 = fig.add_subplot(121, projection='3d')
+        _ = ax1.plot_surface(X2_3d, Y2_3d, Z2_3d, rstride=1, cstride=1, facecolors = cm.jet((phi_3d - min_A)/(max_A - min_A)),
+                       linewidth=0, antialiased=False)
+        _ = ax1.plot_surface(X2_3d, Y2_3d, y, rstride=5, cstride=5, color='dodgerblue', linewidth=0, alpha=0.7)
+        ax1.set_xlabel(r'$x$')
+        ax1.set_ylabel(r'$y$')
+        ax1.set_zlabel(r'$W(x, y)$')
+        ax1.set_xlim((0.0, 1.0))
+        ax1.set_ylim((0.0, 1.0))
+        ax1.grid(False)
+        ax1.set_zlim(0.025, max_A + 0.1)
+        ax1.set_title(r'$T = $'+str(round(t_3d,1)))
+
+        ax2 = fig.add_subplot(122, projection='3d')
+        ax2.plot_surface(Y2, X2, np.zeros_like(X2) - 10000, facecolors = cm.hsv((psi + np.pi)/(2.0 * np.pi)))
+        ax2.plot_surface(Y2, X2, H.T, color='gray', alpha=0.6)
+        ax2.set_xlabel(r'$\angle \Delta W$')
+        ax2.set_ylabel(r'$|W|$')
+        ax2.set_zlabel(r'$g$')
+        ax2.set_title(r'$T = $'+str(T))
+        ax2.set_zlim(-10000, 25000)
+        ax2.set_zticklabels([])
+        ax2.grid(False)
+
+        # Save both
+        plt.subplots_adjust(hspace=2.0)
+        plt.savefig(directory + 'joined_T=' + str(round(t_3d, 1)) + '.png')
+        plt.close()
+
+def makeJoined3DHistogramMovie(directory):
+    images = []
+    for img in os.listdir(directory):
+        if not img.endswith('.png') or not img.startswith('joined_'):
+            continue
+        T = _T(bar_to_dot(img), ext='.png')
+        images.append((T, img))
+    images.sort()
+        
+    frame = cv2.imread(os.path.join(directory, images[0][1]))
+    height, width, _ = frame.shape
+    video_name = 'Ginzburg_Landau_3D_Histogram_Combined.avi'
+    fps = 20
+    video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
+
+    for image in images:
+        if T > 4600.0:
+            break
+        video.write(cv2.imread(os.path.join(directory, image[1])))
+
+    cv2.destroyAllWindows()
+    video.release()
+
 def makeSwarmPlots(data_directory):
     # Load simulation data into memory
     params = {'c1': 0.2, 'c2': 0.61, 'nu': 1.5, 'eta': 1.0}
-    data, min_A, max_A = _load_data(data_directory, params, reduce=True)
+    data, min_A, max_A = _load_data(data_directory, params)
 
     # Compute finite differences approximation of the gradient for all T
     M = 512
@@ -295,9 +406,10 @@ def makeSwarmPlots(data_directory):
         ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
         ax.zaxis._axinfo["grid"]['color'] =  (1,1,1,0)
         ax.scatter(Re_D_data[:,n], Im_D_data[:,n], A_W_data[:,n], s=0.1, cmap='viridis')
-        ax.scatter(Im_D_data[:,n], A_W_data[:,n], zdir='x', zs=-10.**5, color='gray', s=0.1)
-        ax.scatter(Re_D_data[:,n], A_W_data[:,n], zdir='y', zs=10.**5, color='gray', s=0.1)
-        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], zdir='z', zs=min_A, color='gray',s=0.1)
+        ax.scatter(Im_D_data[:,n], A_W_data[:,n], zdir='x', zs=-10.**5 + 1.0, color='gray')
+        ax.scatter(Re_D_data[:,n], A_W_data[:,n], zdir='y', zs=10.**5 - 1.0, color='gray')
+        ax.scatter(Re_D_data[:,n], Im_D_data[:,n], zdir='z', zs=min_A + 0.01, color='gray')
+        #ax.plot(x, y, zs=0, zdir='z', label='curve in (x, y)')
         ax.set_xlim((-10.**5, 10.**5))
         ax.set_ylim((-10.**5, 10.**5))
         ax.set_zlim3d((min_A, max_A))
@@ -324,6 +436,8 @@ def makeSwarmMovie(directory):
     video = cv2.VideoWriter(directory + video_name, 0, fps, (width,height))
 
     for image in images:
+        if T > 4600.0:
+            break
         video.write(cv2.imread(os.path.join(directory, image[1])))
 
     cv2.destroyAllWindows()
@@ -356,8 +470,15 @@ if __name__ == '__main__':
         directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeHistogramMovie(directory=directory)
     elif args.run_type == 'swarm_movie':
-        directory = '/Users/hannesvdc/Research_Data/emergent/Ginzburg_Landau_3D/'
+        directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
         makeSwarmPlots(directory)
         makeSwarmMovie(directory)
+    elif args.run_type == 'swarm_movie_alone': #TODO: Remove Later
+        directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
+        makeSwarmMovie(directory)
+    elif args.run_type == 'joined_3d_histogram':
+        directory = '/Users/hannesvdc/OneDrive - Johns Hopkins/Research_Data/emergent/Ginzburg_Landau_3D/'
+        makeJoined3DHistogramPlots(directory=directory)
+        makeJoined3DHistogramMovie(directory=directory)
     else:
         print('Type of experiment not recognized. Returning.')
